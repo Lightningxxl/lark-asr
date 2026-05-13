@@ -42,7 +42,11 @@ COPY requirements-asr.txt /tmp/requirements-asr.txt
 RUN python -m pip install --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir -r /tmp/requirements-asr.txt
 
-RUN useradd --create-home --uid 1000 app
+RUN set -eux; \
+    if ! getent group 1000 >/dev/null; then groupadd --gid 1000 app; fi; \
+    if ! getent passwd 1000 >/dev/null; then useradd --create-home --uid 1000 --gid 1000 app; fi; \
+    mkdir -p /home/app; \
+    chown -R 1000:1000 /home/app
 
 WORKDIR /app
 
@@ -52,6 +56,6 @@ COPY scripts ./scripts
 
 ENV PYTHONPATH=/app/src
 
-USER app
+USER 1000:1000
 
 ENTRYPOINT ["python", "-m", "lark_asr"]

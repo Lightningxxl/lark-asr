@@ -30,7 +30,11 @@ RUN npm config set registry "${NPM_REGISTRY}" \
       @larksuite/cli@${LARK_CLI_VERSION} \
       @openai/codex@${CODEX_CLI_VERSION}
 
-RUN useradd --create-home --uid 1000 app
+RUN set -eux; \
+    if ! getent group 1000 >/dev/null; then groupadd --gid 1000 app; fi; \
+    if ! getent passwd 1000 >/dev/null; then useradd --create-home --uid 1000 --gid 1000 app; fi; \
+    mkdir -p /home/app; \
+    chown -R 1000:1000 /home/app
 
 WORKDIR /app
 
@@ -40,6 +44,6 @@ COPY scripts ./scripts
 
 ENV PYTHONPATH=/app/src
 
-USER app
+USER 1000:1000
 
 ENTRYPOINT ["python3", "-m", "lark_asr"]
