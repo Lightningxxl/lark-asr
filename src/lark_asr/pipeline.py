@@ -232,7 +232,7 @@ class Pipeline:
         )
         if not self.config.pipeline.auto_kb_write:
             prompt += (
-                "\n\n当前配置 auto_kb_write=false。请只输出归档计划和建议修改，"
+                "\n\n当前配置 auto_kb_write=false。请只输出计划和建议修改，"
                 "不要写入或修改知识库文件。"
             )
         codex_dir = job_dir / "codex"
