@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -57,6 +58,15 @@ def build_parser() -> argparse.ArgumentParser:
     add_config(status_parser)
     status_parser.add_argument("--limit", type=int, default=20, help="Number of jobs to show.")
     status_parser.set_defaults(func=status_command)
+
+    doctor_parser = subparsers.add_parser("doctor", help="Check local runtime dependencies.")
+    add_config(doctor_parser)
+    doctor_parser.add_argument(
+        "--skip-lark",
+        action="store_true",
+        help="Do not run lark-cli dry-run.",
+    )
+    doctor_parser.set_defaults(func=doctor_command)
 
     logs_parser = subparsers.add_parser("logs", help="Show job logs.")
     logs_parser.add_argument("job_id", help="Job ID.")
@@ -154,6 +164,42 @@ def status_command(args: argparse.Namespace) -> None:
         store.close()
 
 
+def doctor_command(args: argparse.Namespace) -> None:
+    loaded = load_config(args.config)
+    loaded.ensure_dirs()
+    checks: list[tuple[str, bool, str]] = []
+
+    checks.append(("state_dir", loaded.paths.state_dir.exists(), str(loaded.paths.state_dir)))
+    checks.append(("work_dir", loaded.paths.work_dir.exists(), str(loaded.paths.work_dir)))
+    checks.append(
+        (
+            "knowledgebase_dir",
+            loaded.paths.knowledgebase_dir.exists(),
+            str(loaded.paths.knowledgebase_dir),
+        )
+    )
+    checks.append(("lark.cli", command_exists(loaded.lark.cli), loaded.lark.cli))
+    checks.append(("codex.cmd", command_exists(loaded.codex.cmd), loaded.codex.cmd))
+
+    if loaded.asr.enabled:
+        asr_head = first_command_word(loaded.asr.command)
+        checks.append(("asr.command", command_exists(asr_head), asr_head or "<empty>"))
+
+    for name, ok, detail in checks:
+        print(f"{'ok' if ok else 'fail'} {name}: {detail}")
+
+    if not args.skip_lark:
+        client = LarkClient(loaded)
+        command = client.event_command()
+        command.insert(3, "--dry-run")
+        result = client.run(command, cwd=loaded.paths.state_dir)
+        print(f"{'ok' if result.ok else 'fail'} lark.event.dry_run: exit={result.returncode}")
+        if result.stdout.strip():
+            print(result.stdout.strip()[:1200])
+        if result.stderr.strip():
+            print(result.stderr.strip()[-1200:], file=sys.stderr)
+
+
 def logs_command(args: argparse.Namespace) -> None:
     _, store = open_store(args.config)
     try:
@@ -189,3 +235,18 @@ def process_event_line(line: str, config: Config, store: Store) -> None:
         job = store.enqueue_seed(seed)
         print(f"queued {job.id}")
 
+
+def command_exists(command: str) -> bool:
+    if not command:
+        return False
+    path = Path(command).expanduser()
+    if path.is_absolute() or "/" in command:
+        return path.exists()
+    return shutil.which(command) is not None
+
+
+def first_command_word(command: str) -> str:
+    command = command.strip()
+    if not command:
+        return ""
+    return command.split()[0]
