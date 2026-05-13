@@ -53,7 +53,8 @@ class LarkClient:
 
     def notes(self, minute_token: str, output_dir: Path) -> CommandResult:
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_dir = output_dir.resolve()
+        cwd = output_dir.parent.resolve()
+        output_arg = output_dir.name
         command = [
             self.config.lark.cli,
             "vc",
@@ -61,18 +62,19 @@ class LarkClient:
             "--minute-tokens",
             minute_token,
             "--output-dir",
-            str(output_dir),
+            output_arg,
             "--overwrite",
             "--as",
             self.config.lark.api_as,
             "--format",
             "json",
         ]
-        return self.run(command, cwd=output_dir)
+        return self.run(command, cwd=cwd)
 
     def download_media(self, minute_token: str, output_dir: Path) -> CommandResult:
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_dir = output_dir.resolve()
+        cwd = output_dir.parent.resolve()
+        output_arg = output_dir.name
         command = [
             self.config.lark.cli,
             "minutes",
@@ -80,14 +82,14 @@ class LarkClient:
             "--minute-tokens",
             minute_token,
             "--output",
-            str(output_dir),
+            output_arg,
             "--overwrite",
             "--as",
             self.config.lark.api_as,
             "--format",
             "json",
         ]
-        return self.run(command, cwd=output_dir)
+        return self.run(command, cwd=cwd)
 
     def run(self, command: list[str], *, cwd: Path) -> CommandResult:
         final_command = self._with_profile(command)
