@@ -15,6 +15,14 @@ api_as = "user"
 event_filter = "im\\.message|vc\\.|calendar\\."
 event_types = ""
 no_proxy = true
+path_prefixes = [
+  "/home/xavierx/.local/share/mise/installs/node/22.22.2/bin",
+  "/home/xavierx/.local/bin",
+]
+
+[lark.env]
+# Uncomment if the wrapper state file lives somewhere else.
+# LARKCLI_TOKEN_STATE_FILE = "/home/xavierx/.config/lark-cli-token-state.json"
 
 [pipeline]
 transcript_first = true

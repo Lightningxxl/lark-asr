@@ -21,6 +21,8 @@ class LarkConfig:
     event_filter: str = r"im\.message|vc\.|calendar\."
     event_types: str = ""
     no_proxy: bool = True
+    path_prefixes: tuple[Path, ...] = ()
+    env: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,8 @@ def load_config(path: str | Path) -> Config:
         event_filter=str(lark_raw.get("event_filter", r"im\.message|vc\.|calendar\.")),
         event_types=str(lark_raw.get("event_types", "")),
         no_proxy=bool(lark_raw.get("no_proxy", True)),
+        path_prefixes=tuple(_path(item) for item in lark_raw.get("path_prefixes", [])),
+        env={str(key): str(value) for key, value in lark_raw.get("env", {}).items()},
     )
     pipeline_raw = raw.get("pipeline", {})
     pipeline = PipelineConfig(
@@ -134,4 +138,3 @@ def load_config(path: str | Path) -> Config:
 
 def _path(value: str) -> Path:
     return Path(value).expanduser()
-
