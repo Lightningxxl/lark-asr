@@ -53,6 +53,7 @@ class LarkClient:
 
     def notes(self, minute_token: str, output_dir: Path) -> CommandResult:
         output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = output_dir.resolve()
         command = [
             self.config.lark.cli,
             "vc",
@@ -71,6 +72,7 @@ class LarkClient:
 
     def download_media(self, minute_token: str, output_dir: Path) -> CommandResult:
         output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = output_dir.resolve()
         command = [
             self.config.lark.cli,
             "minutes",
