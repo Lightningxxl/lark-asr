@@ -7,8 +7,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 ARG LARK_CLI_VERSION=1.0.14
 ARG CODEX_CLI_VERSION=0.125.0
-ARG DEBIAN_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian
-ARG DEBIAN_SECURITY_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian-security
+ARG DEBIAN_APT_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/debian
+ARG DEBIAN_SECURITY_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/debian-security
 ARG NPM_REGISTRY=https://registry.npmjs.org
 
 RUN sed -i \
