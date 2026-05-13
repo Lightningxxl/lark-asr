@@ -1,5 +1,6 @@
 .DS_Store
 .env
+config.toml
 .venv*/
 __pycache__/
 *.py[cod]
@@ -10,5 +11,7 @@ __pycache__/
 data/
 work/
 models/
+secrets/
+config/config.toml
 dist/
 build/
