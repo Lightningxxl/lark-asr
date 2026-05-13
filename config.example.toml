@@ -6,9 +6,9 @@ work_dir = "./work"
 knowledgebase_dir = "/home/xavierx/projects/xfx_knowledge_base"
 
 [lark]
-# Prefer the FF1 wrapper because non-interactive services often do not have the
-# same lark-cli token/PATH environment as an interactive shell.
-cli = "/home/xavierx/lark-cli-wrapper.py"
+# Use the real FF1 lark-cli binary with an explicit config dir. This avoids
+# depending on the older wrapper token-state file.
+cli = "/home/xavierx/.local/share/mise/installs/node/22.22.2/bin/lark-cli"
 profile = ""
 event_as = "bot"
 api_as = "user"
@@ -21,8 +21,8 @@ path_prefixes = [
 ]
 
 [lark.env]
-# Uncomment if the wrapper state file lives somewhere else.
-# LARKCLI_TOKEN_STATE_FILE = "/home/xavierx/.config/lark-cli-token-state.json"
+LARKSUITE_CLI_CONFIG_DIR = "/home/xavierx/.config/lark-cli-token-only"
+LARKSUITE_CLI_NO_UPDATE_NOTIFIER = "1"
 
 [pipeline]
 transcript_first = true

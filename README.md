@@ -24,14 +24,15 @@ $EDITOR config.toml
 
 On FF1 the sample config assumes:
 
-- `lark-cli` wrapper: `/home/xavierx/lark-cli-wrapper.py`
+- `lark-cli`: `/home/xavierx/.local/share/mise/installs/node/22.22.2/bin/lark-cli`
+- lark-cli config dir: `/home/xavierx/.config/lark-cli-token-only`
 - Codex shim: `/home/xavierx/.local/share/mise/shims/codex`
 - Knowledgebase repo: `/home/xavierx/projects/xfx_knowledge_base`
 - Node bin path for lark-cli: `/home/xavierx/.local/share/mise/installs/node/22.22.2/bin`
 
 If the knowledgebase repo is not present on FF1 yet, keep `[codex].enabled = false` until it is cloned there.
 
-If the wrapper fails with `lark-cli-token-state.json` missing, refresh or recreate the FF1 lark-cli login state before starting the hook. The service intentionally does not store app secrets or refresh tokens itself.
+If `lark-asr doctor` reports auth failure, rerun `lark-cli auth login` for the config dir before starting the hook. The service intentionally does not store app secrets or refresh tokens itself.
 
 Manual smoke test with an existing minutes URL:
 
