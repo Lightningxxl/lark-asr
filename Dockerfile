@@ -7,6 +7,7 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY src ./src
+COPY scripts ./scripts
 
 ENV PYTHONPATH=/app/src
 

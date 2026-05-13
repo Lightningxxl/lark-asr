@@ -51,6 +51,36 @@ Run the hook and worker:
 ./bin/lark-asr worker --config config.toml
 ```
 
+## FF1 User Services
+
+On FF1, the most direct deployment is a pair of user-level systemd services. This keeps using the host-installed `lark-cli`, Codex, lark-cli auth config, and GPU environment from `config.toml`.
+
+```bash
+./scripts/install_user_services.sh
+systemctl --user status lark-asr-hook lark-asr-worker
+journalctl --user -u lark-asr-hook -u lark-asr-worker -f
+```
+
+Useful overrides:
+
+```bash
+LARK_ASR_CONFIG=/home/xavierx/projects/lark-asr/config.toml \
+LARK_ASR_WORKER_INTERVAL=20 \
+./scripts/install_user_services.sh
+```
+
+To remove the services:
+
+```bash
+./scripts/uninstall_user_services.sh
+```
+
+If services should survive after the SSH login session is gone or after reboot, enable user lingering once on FF1:
+
+```bash
+sudo loginctl enable-linger xavierx
+```
+
 ## Docker Compose
 
 The compose file expects FF1 host paths such as `/home/xavierx/.local`, `/home/xavierx/.config`, and `/home/xavierx/.codex` to exist because the first version calls host-installed `lark-cli` and `codex`.
@@ -72,6 +102,8 @@ For GPU ASR fallback, set `[asr].enabled = true` and point `[asr].command` at th
 - `{knowledgebase_dir}`
 
 The command should write a Markdown transcript under `{job_dir}`. The worker searches `[asr].output_glob`.
+
+When running under Docker Compose, use `/app/scripts/asr_fallback.sh` for the bundled ASR command path. When running directly on FF1, the sample config uses `/home/xavierx/projects/lark-asr/scripts/asr_fallback.sh`.
 
 The repo includes `scripts/asr_fallback.sh`, which uses bundled helper scripts:
 
