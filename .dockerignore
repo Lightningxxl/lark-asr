@@ -1,0 +1,17 @@
+.git
+.env
+.venv*
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+config/config.toml
+config.toml
+data/
+work/
+models/
+secrets/
+dist/
+build/
