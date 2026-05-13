@@ -62,7 +62,7 @@ Reference: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/lat
 
 ## Known FF1 Blockers
 
-- Docker Hub pulls currently time out during TLS handshake.
+- External image/package downloads are slow or unreliable. The initial `python:3.12-slim` pull failed with a Docker Hub TLS handshake timeout; a later `node:22-bookworm-slim` based hook build reached `apt-get update` but was stopped after a 90 second probe timeout.
 - Docker NVIDIA runtime is missing.
 - The currently running service is still host-run systemd.
 

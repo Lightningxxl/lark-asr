@@ -7,7 +7,7 @@ This is a factual snapshot of the current FF1 deployment.
 - Host: `ff1`
 - Runtime today: host-run `systemd --user`, not Docker.
 - Directory: `/home/xavierx/projects/lark-asr`
-- FF1 copy is not currently a git worktree; it was synchronized by tar.
+- FF1 copy is now a git worktree at `origin/main`.
 - Services:
   - `lark-asr-hook.service`: enabled, active
   - `lark-asr-worker.service`: enabled, active
@@ -52,8 +52,9 @@ Existing ASR work directory:
 - Docker Compose is installed.
 - Docker NVIDIA runtime is not configured. `docker info` lists `runc`, but not `nvidia`.
 - `nvidia-ctk` was not found.
-- Pulling `python:3.12-slim` from Docker Hub failed with TLS handshake timeout during audit.
+- Pulling `python:3.12-slim` from Docker Hub failed with TLS handshake timeout during the initial audit.
+- After the Docker restructure, `node:22-bookworm-slim` resolved and was cached, but `docker compose build hook` was still too slow at `apt-get update` and was stopped by a 90 second probe timeout.
 
 ## Main Gap
 
-The project has a working host-run MVP, but not a clean Docker-managed deployment yet. The Docker work needs to make runtime, config, secrets, model mounts, and GPU prerequisites explicit.
+The project has a working host-run MVP and a Docker-first repo layout. Docker production migration is still blocked by FF1 Docker GPU runtime setup and slow external package/image downloads.
