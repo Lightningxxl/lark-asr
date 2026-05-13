@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT="${LARK_ASR_HOME:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
+export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m lark_asr "$@"
