@@ -8,7 +8,7 @@ The intended flow is:
 2. Resolve `minute_token` from a minutes URL, meeting ID, or calendar event ID.
 3. Prefer Feishu's generated transcript.
 4. If Feishu has media but no transcript, run a local ASR command on FF1.
-5. Hand the transcript to Codex inside the knowledgebase repo so it can apply the repo's own rules.
+5. Hand the transcript to Codex inside the knowledgebase repo.
 
 This deliberately uses the presence of transcript/media as the source of truth. It does not guess whether the Feishu quota has been exhausted.
 
@@ -78,7 +78,7 @@ Set `[codex].enabled = true` after confirming the transcript path looks right.
 
 With `auto_kb_write = false`, Codex runs in read-only mode and produces an import plan. With `auto_kb_write = true`, Codex can edit the knowledgebase repo directly.
 
-The prompt is intentionally short and tells Codex to read `AGENTS.md` and local context instead of encoding knowledgebase rules in this service.
+The prompt is intentionally short and tells Codex to read `AGENTS.md` and local context instead of encoding knowledgebase conventions in this service.
 
 ## Useful Commands
 

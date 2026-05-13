@@ -52,7 +52,7 @@ reasoning_effort = "high"
 extra_args = ""
 prompt_template = """
 你在 xfx_knowledge_base 仓库中工作。
-请先读取仓库规则、AGENTS.md 和相关项目上下文。
+请先读取仓库约定、AGENTS.md 和相关项目上下文。
 
 会议转写稿路径:
 {transcript_path}
@@ -63,8 +63,8 @@ prompt_template = """
 - calendar_event_id: {calendar_event_id}
 - project_hint: {project_hint}
 
-请根据知识库内容做热词修复，再按知识库规则把会议材料归档。
-不要硬编码规则；遵循仓库里的 AGENTS.md。
+请根据仓库内已有约定处理这份转写稿。
+不要在本提示里假设具体放置方法或处理细则；以知识库仓库内容为准。
 """
 
 [[project]]
