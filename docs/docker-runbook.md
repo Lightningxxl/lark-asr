@@ -22,7 +22,7 @@ The containers should own the application runtime. Host paths are only for:
 
 - `compose.yaml`: Docker-first hook and worker services.
 - `Dockerfile`: lightweight app image with Python, `lark-cli`, and Codex CLI.
-- `docker/Dockerfile.asr`: GPU worker image with app runtime plus ASR dependencies.
+- `docker/Dockerfile.asr`: GPU worker image with app runtime plus ASR dependencies. It defaults to the same Debian/Node base as the hook image and uses CUDA-enabled Python wheels to avoid pulling a large NVIDIA CUDA base image on FF1's slow Docker Hub path.
 - `config/docker.example.toml`: container paths and commands.
 - `.env.example`: FF1 path bindings and image pins.
 - `scripts/bootstrap_docker_project.sh`: creates local config/data/work folders.
@@ -51,22 +51,18 @@ sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
 ```
 
-Then verify:
+Then verify the runtime is registered:
 
 ```bash
 docker info | grep -i nvidia
-docker run --rm --gpus all nvidia/cuda:13.0.2-base-ubuntu24.04 nvidia-smi
 ```
 
 Reference: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 
 ## Known FF1 Blockers
 
-- External image/package downloads are slow or unreliable. The initial `python:3.12-slim` pull failed with a Docker Hub TLS handshake timeout; a later `node:22-bookworm-slim` based hook build reached `apt-get update` but was stopped after a 90 second probe timeout.
-- Docker NVIDIA runtime is missing.
-- The currently running service is still host-run systemd.
-
-Resolve those before switching production traffic from systemd to Docker.
+- External image/package downloads are slow or unreliable. Keep build mirrors configurable in `.env`; avoid NVIDIA CUDA base images unless the network path is fixed.
+- The Docker worker still needs one successful GPU smoke test after the image finishes building.
 
 ## Migration Sequence
 

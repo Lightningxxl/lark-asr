@@ -29,6 +29,10 @@ for var in LARK_CLI_CONFIG_DIR CODEX_HOME KNOWLEDGEBASE_DIR MODELS_DIR; do
   fi
 done
 
+if [[ "${ASR_BASE_IMAGE:-}" == nvidia/cuda* ]]; then
+  warn "ASR_BASE_IMAGE=$ASR_BASE_IMAGE will pull a large NVIDIA CUDA base image; unset it or use node:22-bookworm-slim on FF1's current network"
+fi
+
 if command -v docker >/dev/null 2>&1; then
   ok "docker: $(docker --version)"
 else
