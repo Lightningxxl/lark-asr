@@ -17,7 +17,7 @@ fi
 
 if [[ ! -f "$CONFIG" ]]; then
   echo "missing config: $CONFIG" >&2
-  echo "copy config.example.toml to config.toml and edit it first" >&2
+  echo "copy config/ff1-host.example.toml to config.toml and edit it first" >&2
   exit 1
 fi
 

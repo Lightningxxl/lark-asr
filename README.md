@@ -14,10 +14,38 @@ This deliberately uses the presence of transcript/media as the source of truth. 
 
 ## Quick Start On FF1
 
+The intended managed deployment is Docker Compose:
+
 ```bash
 git clone https://github.com/Lightningxxl/lark-asr.git
 cd lark-asr
-cp config.example.toml config.toml
+./scripts/bootstrap_docker_project.sh
+$EDITOR .env
+$EDITOR config/config.toml
+./scripts/docker_doctor.sh
+docker compose up -d --build
+docker compose logs -f
+```
+
+The Compose deployment uses:
+
+- `hook`: listens to Lark/Feishu events.
+- `worker`: resolves transcripts, runs local ASR fallback, and invokes Codex.
+- `config/config.toml`: runtime behavior.
+- `.env`: host path bindings for auth, knowledgebase, and models.
+- `data/`: SQLite state.
+- `work/`: job artifacts.
+
+FF1 currently still has a host-run `systemd --user` MVP online. See `docs/ff1-current-state-2026-05-13.md` before migrating it to Docker.
+
+## Host-Run Fallback
+
+Use this only as a fallback while Docker GPU/runtime/network prerequisites are being fixed:
+
+```bash
+git clone https://github.com/Lightningxxl/lark-asr.git
+cd lark-asr
+cp config/ff1-host.example.toml config.toml
 $EDITOR config.toml
 ./bin/lark-asr init --config config.toml
 ```
@@ -83,10 +111,18 @@ sudo loginctl enable-linger xavierx
 
 ## Docker Compose
 
-The compose file expects FF1 host paths such as `/home/xavierx/.local`, `/home/xavierx/.config`, and `/home/xavierx/.codex` to exist because the first version calls host-installed `lark-cli` and `codex`.
+The compose file expects only explicit host path bindings from `.env`:
+
+- `LARK_CLI_CONFIG_DIR`
+- `CODEX_HOME`
+- `KNOWLEDGEBASE_DIR`
+- `MODELS_DIR`
+
+It does not mount host-installed `lark-cli`, Codex, or Python virtualenvs. The images own those runtimes.
 
 ```bash
-cp config.example.toml config.toml
+./scripts/bootstrap_docker_project.sh
+./scripts/docker_doctor.sh
 docker compose up -d --build
 docker compose logs -f
 ```
@@ -103,7 +139,7 @@ For GPU ASR fallback, set `[asr].enabled = true` and point `[asr].command` at th
 
 The command should write a Markdown transcript under `{job_dir}`. The worker searches `[asr].output_glob`.
 
-When running under Docker Compose, use `/app/scripts/asr_fallback.sh` for the bundled ASR command path. When running directly on FF1, the sample config uses `/home/xavierx/projects/lark-asr/scripts/asr_fallback.sh`.
+When running under Docker Compose, use `/app/scripts/asr_fallback.sh` for the bundled ASR command path. The Docker config uses `/models/whisper-large-v3-ct2-float16`, so `MODELS_DIR` should point to the directory containing that model folder.
 
 The repo includes `scripts/asr_fallback.sh`, which uses bundled helper scripts:
 
@@ -120,7 +156,9 @@ Useful environment knobs for the ASR command:
 - `LARK_ASR_DEVICE`
 - `LARK_ASR_FUNASR_DEVICE`
 
-The current FF1 host has an existing ASR environment at `/home/xavierx/codex-transcript-20260512/.venv/bin/python` and a local faster-whisper CT2 model at `/home/xavierx/codex-transcript-20260512/models/AI-ModelScope/whisper-large-v3-ct2-float16`. Use that model path as `LARK_ASR_WHISPER_MODEL` to avoid a fresh download.
+The current FF1 host has an existing ASR environment at `/home/xavierx/codex-transcript-20260512/.venv/bin/python` and a local faster-whisper CT2 model at `/home/xavierx/codex-transcript-20260512/models/AI-ModelScope/whisper-large-v3-ct2-float16`. Docker should reuse the model files via `MODELS_DIR`, not mount the old virtualenv.
+
+See `docs/docker-runbook.md` for the Docker migration sequence and current FF1 blockers.
 
 ## Codex Step
 

@@ -1,27 +1,20 @@
-# Copy this file to config.toml on FF1 and edit paths.
-
 [paths]
-state_dir = "./data"
-work_dir = "./work"
-knowledgebase_dir = "/home/xavierx/projects/xfx_knowledge_base"
+state_dir = "/data"
+work_dir = "/work"
+knowledgebase_dir = "/knowledgebase"
 
 [lark]
-# Use the real FF1 lark-cli binary with an explicit config dir. This avoids
-# depending on the older wrapper token-state file.
-cli = "/home/xavierx/.local/share/mise/installs/node/22.22.2/bin/lark-cli"
+cli = "lark-cli"
 profile = ""
 event_as = "bot"
 api_as = "user"
 event_filter = "im\\.message|vc\\.|calendar\\."
 event_types = ""
 no_proxy = true
-path_prefixes = [
-  "/home/xavierx/.local/share/mise/installs/node/22.22.2/bin",
-  "/home/xavierx/.local/bin",
-]
+path_prefixes = []
 
 [lark.env]
-LARKSUITE_CLI_CONFIG_DIR = "/home/xavierx/.config/lark-cli-token-only"
+LARKSUITE_CLI_CONFIG_DIR = "/secrets/lark-cli"
 LARKSUITE_CLI_NO_UPDATE_NOTIFIER = "1"
 
 [pipeline]
@@ -32,18 +25,15 @@ minimum_transcript_chars = 80
 auto_kb_write = false
 
 [asr]
-# Command runs only when Feishu has media but no transcript.
-# The command should write a Markdown transcript under {job_dir}; the worker will
-# pick the newest *.md by default.
-enabled = false
+enabled = true
 command = """
 env \
-  LARK_ASR_PYTHON=/home/xavierx/codex-transcript-20260512/.venv/bin/python \
-  LARK_ASR_WHISPER_MODEL=/home/xavierx/codex-transcript-20260512/models/AI-ModelScope/whisper-large-v3-ct2-float16 \
+  LARK_ASR_PYTHON=python \
+  LARK_ASR_WHISPER_MODEL=/models/whisper-large-v3-ct2-float16 \
   LARK_ASR_USE_WHISPER=1 \
   LARK_ASR_DEVICE=cuda \
   LARK_ASR_FUNASR_DEVICE=cuda:0 \
-  /home/xavierx/projects/lark-asr/scripts/asr_fallback.sh \
+  /app/scripts/asr_fallback.sh \
   --input {media_path} \
   --output-dir {job_dir}/local_asr \
   --minute-token {minute_token}
@@ -51,8 +41,8 @@ env \
 output_glob = "local_asr/**/*.md"
 
 [codex]
-enabled = false
-cmd = "/home/xavierx/.local/share/mise/shims/codex"
+enabled = true
+cmd = "codex"
 model = ""
 reasoning_effort = "high"
 extra_args = ""

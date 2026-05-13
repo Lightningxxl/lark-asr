@@ -1,0 +1,75 @@
+# Host-run fallback config for FF1 systemd services. Prefer config/docker.example.toml
+# for the managed Docker deployment.
+
+[paths]
+state_dir = "./data"
+work_dir = "./work"
+knowledgebase_dir = "/home/xavierx/projects/xfx_knowledge_base"
+
+[lark]
+cli = "/home/xavierx/.local/share/mise/installs/node/22.22.2/bin/lark-cli"
+profile = ""
+event_as = "bot"
+api_as = "user"
+event_filter = "im\\.message|vc\\.|calendar\\."
+event_types = ""
+no_proxy = true
+path_prefixes = [
+  "/home/xavierx/.local/share/mise/installs/node/22.22.2/bin",
+  "/home/xavierx/.local/bin",
+]
+
+[lark.env]
+LARKSUITE_CLI_CONFIG_DIR = "/home/xavierx/.config/lark-cli-token-only"
+LARKSUITE_CLI_NO_UPDATE_NOTIFIER = "1"
+
+[pipeline]
+transcript_first = true
+local_asr_fallback = true
+resolve_retries = ["1m", "5m", "15m", "30m"]
+minimum_transcript_chars = 80
+auto_kb_write = false
+
+[asr]
+enabled = true
+command = """
+env \
+  LARK_ASR_PYTHON=/home/xavierx/codex-transcript-20260512/.venv/bin/python \
+  LARK_ASR_WHISPER_MODEL=/home/xavierx/codex-transcript-20260512/models/AI-ModelScope/whisper-large-v3-ct2-float16 \
+  LARK_ASR_USE_WHISPER=1 \
+  LARK_ASR_DEVICE=cuda \
+  LARK_ASR_FUNASR_DEVICE=cuda:0 \
+  /home/xavierx/projects/lark-asr/scripts/asr_fallback.sh \
+  --input {media_path} \
+  --output-dir {job_dir}/local_asr \
+  --minute-token {minute_token}
+"""
+output_glob = "local_asr/**/*.md"
+
+[codex]
+enabled = true
+cmd = "/home/xavierx/.local/share/mise/shims/codex"
+model = ""
+reasoning_effort = "high"
+extra_args = ""
+prompt_template = """
+你在 xfx_knowledge_base 仓库中工作。
+请先读取仓库约定、AGENTS.md 和相关项目上下文。
+
+会议转写稿路径:
+{transcript_path}
+
+会议元数据:
+- minute_token: {minute_token}
+- meeting_id: {meeting_id}
+- calendar_event_id: {calendar_event_id}
+- project_hint: {project_hint}
+
+请根据仓库内已有约定处理这份转写稿。
+不要在本提示里假设具体放置方法或处理细则；以知识库仓库内容为准。
+"""
+
+[[project]]
+id = "smart-store"
+path = "projects/active/汽车膜车衣AI智慧门店"
+aliases = ["智慧门店", "龙膜", "贴膜", "车衣", "国总", "崧高维岳", "门店经营 OS"]
