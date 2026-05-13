@@ -1,0 +1,34 @@
+services:
+  hook:
+    build: .
+    restart: unless-stopped
+    command: ["hook", "--config", "/config/config.toml"]
+    environment:
+      HOME: /home/xavierx
+      LARK_CLI_NO_PROXY: "1"
+    volumes:
+      - ./config.toml:/config/config.toml:ro
+      - ./data:/app/data
+      - ./work:/app/work
+      # Mount host credentials/binaries when using FF1-installed lark-cli/codex.
+      - /home/xavierx/.config:/home/xavierx/.config
+      - /home/xavierx/.codex:/home/xavierx/.codex
+      - /home/xavierx/.local:/home/xavierx/.local:ro
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["worker", "--config", "/config/config.toml", "--interval", "20"]
+    environment:
+      HOME: /home/xavierx
+      LARK_CLI_NO_PROXY: "1"
+    gpus: all
+    volumes:
+      - ./config.toml:/config/config.toml:ro
+      - ./data:/app/data
+      - ./work:/app/work
+      - /home/xavierx/projects/xfx_knowledge_base:/home/xavierx/projects/xfx_knowledge_base
+      - /home/xavierx/codex-transcript-20260512:/home/xavierx/codex-transcript-20260512
+      - /home/xavierx/.config:/home/xavierx/.config
+      - /home/xavierx/.codex:/home/xavierx/.codex
+      - /home/xavierx/.local:/home/xavierx/.local:ro

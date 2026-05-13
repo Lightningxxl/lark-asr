@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lark-asr"
+version = "0.1.0"
+description = "Feishu/Lark transcript-first ingestion with local ASR fallback for FF1."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+]
+
+[project.optional-dependencies]
+dev = []
+
+[project.scripts]
+lark-asr = "lark_asr.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

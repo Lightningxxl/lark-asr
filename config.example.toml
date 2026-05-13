@@ -1,0 +1,64 @@
+# Copy this file to config.toml on FF1 and edit paths.
+
+[paths]
+state_dir = "./data"
+work_dir = "./work"
+knowledgebase_dir = "/home/xavierx/projects/xfx_knowledge_base"
+
+[lark]
+cli = "/home/xavierx/.local/bin/lark-cli"
+profile = ""
+event_as = "bot"
+api_as = "user"
+event_filter = "im\\.message|vc\\.|calendar\\."
+event_types = ""
+no_proxy = true
+
+[pipeline]
+transcript_first = true
+local_asr_fallback = true
+resolve_retries = ["1m", "5m", "15m", "30m"]
+minimum_transcript_chars = 80
+auto_kb_write = false
+
+[asr]
+# Command runs only when Feishu has media but no transcript.
+# The command should write a Markdown transcript under {job_dir}; the worker will
+# pick the newest *.md by default.
+enabled = false
+command = """
+/home/xavierx/codex-transcript-20260512/run_whisper_fallback.sh \
+  --input {media_path} \
+  --output-dir {job_dir}/local_asr \
+  --minute-token {minute_token}
+"""
+output_glob = "local_asr/**/*.md"
+
+[codex]
+enabled = false
+cmd = "/home/xavierx/.local/bin/codex"
+model = ""
+reasoning_effort = "high"
+extra_args = ""
+prompt_template = """
+你在 xfx_knowledge_base 仓库中工作。
+请先读取仓库规则、AGENTS.md 和相关项目上下文。
+
+会议转写稿路径:
+{transcript_path}
+
+会议元数据:
+- minute_token: {minute_token}
+- meeting_id: {meeting_id}
+- calendar_event_id: {calendar_event_id}
+- project_hint: {project_hint}
+
+请根据知识库内容做热词修复，再按知识库规则把会议材料归档。
+不要硬编码规则；遵循仓库里的 AGENTS.md。
+"""
+
+[[project]]
+id = "smart-store"
+path = "projects/active/汽车膜车衣AI智慧门店"
+aliases = ["智慧门店", "龙膜", "贴膜", "车衣", "国总", "崧高维岳", "门店经营 OS"]
+
