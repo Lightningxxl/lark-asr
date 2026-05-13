@@ -9,6 +9,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 ARG LARK_CLI_VERSION=1.0.14
 ARG CODEX_CLI_VERSION=0.125.0
+ARG UBUNTU_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu
+ARG NPM_REGISTRY=https://registry.npmjs.org
+
+RUN sed -i \
+      -e "s|http://archive.ubuntu.com/ubuntu|${UBUNTU_APT_MIRROR}|g" \
+      -e "s|http://security.ubuntu.com/ubuntu|${UBUNTU_APT_MIRROR}|g" \
+      /etc/apt/sources.list.d/ubuntu.sources
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -23,7 +30,8 @@ RUN apt-get update \
       python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g \
+RUN npm config set registry "${NPM_REGISTRY}" \
+    && npm install -g \
       @larksuite/cli@${LARK_CLI_VERSION} \
       @openai/codex@${CODEX_CLI_VERSION}
 

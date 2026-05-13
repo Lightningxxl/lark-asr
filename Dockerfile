@@ -7,6 +7,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 ARG LARK_CLI_VERSION=1.0.14
 ARG CODEX_CLI_VERSION=0.125.0
+ARG DEBIAN_APT_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian
+ARG DEBIAN_SECURITY_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian-security
+ARG NPM_REGISTRY=https://registry.npmjs.org
+
+RUN sed -i \
+      -e "s|http://deb.debian.org/debian-security|${DEBIAN_SECURITY_MIRROR}|g" \
+      -e "s|http://deb.debian.org/debian|${DEBIAN_APT_MIRROR}|g" \
+      /etc/apt/sources.list.d/debian.sources
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -16,7 +24,8 @@ RUN apt-get update \
       python3 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g \
+RUN npm config set registry "${NPM_REGISTRY}" \
+    && npm install -g \
       @larksuite/cli@${LARK_CLI_VERSION} \
       @openai/codex@${CODEX_CLI_VERSION}
 
