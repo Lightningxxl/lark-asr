@@ -6,7 +6,9 @@ work_dir = "./work"
 knowledgebase_dir = "/home/xavierx/projects/xfx_knowledge_base"
 
 [lark]
-cli = "/home/xavierx/.local/bin/lark-cli"
+# Prefer the FF1 wrapper because non-interactive services often do not have the
+# same lark-cli token/PATH environment as an interactive shell.
+cli = "/home/xavierx/lark-cli-wrapper.py"
 profile = ""
 event_as = "bot"
 api_as = "user"
@@ -36,7 +38,7 @@ output_glob = "local_asr/**/*.md"
 
 [codex]
 enabled = false
-cmd = "/home/xavierx/.local/bin/codex"
+cmd = "/home/xavierx/.local/share/mise/shims/codex"
 model = ""
 reasoning_effort = "high"
 extra_args = ""
@@ -61,4 +63,3 @@ prompt_template = """
 id = "smart-store"
 path = "projects/active/汽车膜车衣AI智慧门店"
 aliases = ["智慧门店", "龙膜", "贴膜", "车衣", "国总", "崧高维岳", "门店经营 OS"]
-

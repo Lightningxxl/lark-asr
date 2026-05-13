@@ -22,6 +22,14 @@ $EDITOR config.toml
 ./bin/lark-asr init --config config.toml
 ```
 
+On FF1 the sample config assumes:
+
+- `lark-cli` wrapper: `/home/xavierx/lark-cli-wrapper.py`
+- Codex shim: `/home/xavierx/.local/share/mise/shims/codex`
+- Knowledgebase repo: `/home/xavierx/projects/xfx_knowledge_base`
+
+If the knowledgebase repo is not present on FF1 yet, keep `[codex].enabled = false` until it is cloned there.
+
 Manual smoke test with an existing minutes URL:
 
 ```bash

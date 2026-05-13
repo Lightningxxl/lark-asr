@@ -14,6 +14,7 @@ services:
       - /home/xavierx/.config:/home/xavierx/.config
       - /home/xavierx/.codex:/home/xavierx/.codex
       - /home/xavierx/.local:/home/xavierx/.local:ro
+      - /home/xavierx/lark-cli-wrapper.py:/home/xavierx/lark-cli-wrapper.py:ro
 
   worker:
     build: .
@@ -32,3 +33,4 @@ services:
       - /home/xavierx/.config:/home/xavierx/.config
       - /home/xavierx/.codex:/home/xavierx/.codex
       - /home/xavierx/.local:/home/xavierx/.local:ro
+      - /home/xavierx/lark-cli-wrapper.py:/home/xavierx/lark-cli-wrapper.py:ro
