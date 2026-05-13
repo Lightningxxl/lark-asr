@@ -37,7 +37,13 @@ auto_kb_write = false
 # pick the newest *.md by default.
 enabled = false
 command = """
-/home/xavierx/projects/lark-asr/scripts/asr_fallback.sh \
+env \
+  LARK_ASR_PYTHON=/home/xavierx/codex-transcript-20260512/.venv/bin/python \
+  LARK_ASR_WHISPER_MODEL=/home/xavierx/codex-transcript-20260512/models/AI-ModelScope/whisper-large-v3-ct2-float16 \
+  LARK_ASR_USE_WHISPER=1 \
+  LARK_ASR_DEVICE=cuda \
+  LARK_ASR_FUNASR_DEVICE=cuda:0 \
+  /home/xavierx/projects/lark-asr/scripts/asr_fallback.sh \
   --input {media_path} \
   --output-dir {job_dir}/local_asr \
   --minute-token {minute_token}

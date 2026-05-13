@@ -120,6 +120,8 @@ Useful environment knobs for the ASR command:
 - `LARK_ASR_DEVICE`
 - `LARK_ASR_FUNASR_DEVICE`
 
+The current FF1 host has an existing ASR environment at `/home/xavierx/codex-transcript-20260512/.venv/bin/python` and a local faster-whisper CT2 model at `/home/xavierx/codex-transcript-20260512/models/AI-ModelScope/whisper-large-v3-ct2-float16`. Use that model path as `LARK_ASR_WHISPER_MODEL` to avoid a fresh download.
+
 ## Codex Step
 
 Set `[codex].enabled = true` after confirming the transcript path looks right.
