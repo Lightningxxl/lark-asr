@@ -72,6 +72,21 @@ For GPU ASR fallback, set `[asr].enabled = true` and point `[asr].command` at th
 
 The command should write a Markdown transcript under `{job_dir}`. The worker searches `[asr].output_glob`.
 
+The repo includes `scripts/asr_fallback.sh`, which uses bundled helper scripts:
+
+- `transcribe_funasr.py` for FunASR/SenseVoice + VAD + punctuation + CAM++ speaker labels.
+- `transcribe_faster_whisper.py` for Whisper large-v3 text when `faster-whisper` is available.
+- `label_whisper_with_speakers.py` to combine Whisper text with FunASR speaker segments.
+
+Useful environment knobs for the ASR command:
+
+- `LARK_ASR_PYTHON`
+- `LARK_ASR_WHISPER_MODEL`
+- `LARK_ASR_WHISPER_MODEL_DIR`
+- `LARK_ASR_USE_WHISPER`
+- `LARK_ASR_DEVICE`
+- `LARK_ASR_FUNASR_DEVICE`
+
 ## Codex Step
 
 Set `[codex].enabled = true` after confirming the transcript path looks right.
