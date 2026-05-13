@@ -6,7 +6,9 @@ work_dir = "./work"
 knowledgebase_dir = "/path/to/projects/knowledgebase"
 
 [lark]
-cli = "/path/to/.local/bin/lark-cli"
+# Prefer the host wrapper because non-interactive services often do not have the
+# same lark-cli token/PATH environment as an interactive shell.
+cli = "/path/to/lark-cli-wrapper.py"
 profile = ""
 event_as = "bot"
 api_as = "user"
@@ -36,7 +38,7 @@ output_glob = "local_asr/**/*.md"
 
 [codex]
 enabled = false
-cmd = "/path/to/.local/bin/codex"
+cmd = "/path/to/.local/share/mise/shims/codex"
 model = ""
 reasoning_effort = "high"
 extra_args = ""
@@ -61,4 +63,3 @@ prompt_template = """
 id = "demo-project"
 path = "projects/active/Demo Demo AliasAIDemo Project"
 aliases = ["Demo Project", "Demo Alias", "Demo Alias", "Demo Alias", "Demo Contact", "Demo Alias", "Demo OS"]
-

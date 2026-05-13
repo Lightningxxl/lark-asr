@@ -14,6 +14,7 @@ services:
       - /path/to/.config:/path/to/.config
       - /path/to/.codex:/path/to/.codex
       - /path/to/.local:/path/to/.local:ro
+      - /path/to/lark-cli-wrapper.py:/path/to/lark-cli-wrapper.py:ro
 
   worker:
     build: .
@@ -32,3 +33,4 @@ services:
       - /path/to/.config:/path/to/.config
       - /path/to/.codex:/path/to/.codex
       - /path/to/.local:/path/to/.local:ro
+      - /path/to/lark-cli-wrapper.py:/path/to/lark-cli-wrapper.py:ro

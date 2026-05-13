@@ -22,6 +22,14 @@ $EDITOR config.toml
 ./bin/lark-asr init --config config.toml
 ```
 
+On host the sample config assumes:
+
+- `lark-cli` wrapper: `/path/to/lark-cli-wrapper.py`
+- Codex shim: `/path/to/.local/share/mise/shims/codex`
+- Knowledgebase repo: `/path/to/projects/knowledgebase`
+
+If the knowledgebase repo is not present on host yet, keep `[codex].enabled = false` until it is cloned there.
+
 Manual smoke test with an existing minutes URL:
 
 ```bash
