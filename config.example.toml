@@ -37,7 +37,7 @@ auto_kb_write = false
 # pick the newest *.md by default.
 enabled = false
 command = """
-/home/xavierx/codex-transcript-20260512/run_whisper_fallback.sh \
+/home/xavierx/projects/lark-asr/scripts/asr_fallback.sh \
   --input {media_path} \
   --output-dir {job_dir}/local_asr \
   --minute-token {minute_token}
