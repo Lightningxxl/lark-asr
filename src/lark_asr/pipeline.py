@@ -263,6 +263,7 @@ class Pipeline:
         completed = subprocess.run(
             command,
             cwd=self.config.paths.knowledgebase_dir,
+            env=self.lark.env(),
             text=True,
             capture_output=True,
             check=False,
@@ -387,4 +388,3 @@ def sanitize_filename(value: str) -> str:
 class DefaultDict(dict[str, str]):
     def __missing__(self, key: str) -> str:
         return ""
-

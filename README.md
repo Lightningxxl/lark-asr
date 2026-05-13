@@ -27,8 +27,11 @@ On host the sample config assumes:
 - `lark-cli` wrapper: `/path/to/lark-cli-wrapper.py`
 - Codex shim: `/path/to/.local/share/mise/shims/codex`
 - Knowledgebase repo: `/path/to/projects/knowledgebase`
+- Node bin path for lark-cli: `/path/to/.local/share/mise/installs/node/22.22.2/bin`
 
 If the knowledgebase repo is not present on host yet, keep `[codex].enabled = false` until it is cloned there.
+
+If the wrapper fails with `lark-cli-token-state.json` missing, refresh or recreate the host lark-cli login state before starting the hook. The service intentionally does not store app secrets or refresh tokens itself.
 
 Manual smoke test with an existing minutes URL:
 

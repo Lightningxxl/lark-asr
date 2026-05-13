@@ -108,6 +108,10 @@ class LarkClient:
         env = os.environ.copy()
         if self.config.lark.no_proxy:
             env["LARK_CLI_NO_PROXY"] = "1"
+        if self.config.lark.path_prefixes:
+            prefix = os.pathsep.join(str(path) for path in self.config.lark.path_prefixes)
+            env["PATH"] = prefix + os.pathsep + env.get("PATH", "")
+        env.update(self.config.lark.env)
         return env
 
     def _with_profile(self, command: list[str]) -> list[str]:
@@ -171,4 +175,3 @@ def iter_json_items(value: Any) -> Iterable[tuple[str, Any]]:
 
 def normalize_key(key: str) -> str:
     return "".join(ch for ch in key.lower() if ch.isalnum())
-
