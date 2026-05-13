@@ -11,6 +11,7 @@ x-lark-asr-common: &lark-asr-common
     - ./data:/data
     - ./work:/work
     - ${LARK_CLI_CONFIG_DIR:?set LARK_CLI_CONFIG_DIR in .env}:/secrets/lark-cli
+    - ${LARK_CLI_DATA_DIR:?set LARK_CLI_DATA_DIR in .env}:/secrets/lark-cli-data
 
 services:
   hook:
@@ -54,6 +55,7 @@ services:
       - ./data:/data
       - ./work:/work
       - ${LARK_CLI_CONFIG_DIR:?set LARK_CLI_CONFIG_DIR in .env}:/secrets/lark-cli
+      - ${LARK_CLI_DATA_DIR:?set LARK_CLI_DATA_DIR in .env}:/secrets/lark-cli-data
       - ${CODEX_HOME:?set CODEX_HOME in .env}:/home/app/.codex
       - ${KNOWLEDGEBASE_DIR:?set KNOWLEDGEBASE_DIR in .env}:/knowledgebase
       - ${MODELS_DIR:-./models}:/models

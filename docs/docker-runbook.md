@@ -13,6 +13,7 @@ docker compose up -d --build
 The containers should own the application runtime. Host paths are only for:
 
 - Lark CLI auth state
+- Lark CLI encrypted secret data
 - Codex auth/config state
 - knowledgebase repository
 - model cache
@@ -35,6 +36,7 @@ The containers should own the application runtime. Host paths are only for:
 3. Reachable image registries or a configured Docker registry mirror/proxy.
 4. Existing auth directories:
    - `LARK_CLI_CONFIG_DIR=/path/to/.config/lark-cli`
+   - `LARK_CLI_DATA_DIR=/path/to/.local/share/lark-cli`
    - `CODEX_HOME=/path/to/.codex`
 5. Existing knowledgebase:
    - `KNOWLEDGEBASE_DIR=/path/to/projects/knowledgebase`
