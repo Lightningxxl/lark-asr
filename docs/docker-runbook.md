@@ -13,6 +13,7 @@ docker compose up -d --build
 The containers should own the application runtime. Host paths are only for:
 
 - Lark CLI auth state
+- Lark CLI encrypted secret data
 - Codex auth/config state
 - knowledgebase repository
 - model cache
@@ -35,6 +36,7 @@ The containers should own the application runtime. Host paths are only for:
 3. Reachable image registries or a configured Docker registry mirror/proxy.
 4. Existing auth directories:
    - `LARK_CLI_CONFIG_DIR=/home/xavierx/.config/lark-cli-token-only`
+   - `LARK_CLI_DATA_DIR=/home/xavierx/.local/share/lark-cli`
    - `CODEX_HOME=/home/xavierx/.codex`
 5. Existing knowledgebase:
    - `KNOWLEDGEBASE_DIR=/home/xavierx/projects/xfx_knowledge_base`

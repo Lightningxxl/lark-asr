@@ -18,7 +18,7 @@ if [[ -f .env ]]; then
 fi
 set +a
 
-for var in LARK_CLI_CONFIG_DIR CODEX_HOME KNOWLEDGEBASE_DIR MODELS_DIR; do
+for var in LARK_CLI_CONFIG_DIR LARK_CLI_DATA_DIR CODEX_HOME KNOWLEDGEBASE_DIR MODELS_DIR; do
   value="${!var:-}"
   if [[ -z "$value" ]]; then
     fail "$var is not set"
