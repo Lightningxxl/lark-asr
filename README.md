@@ -115,6 +115,7 @@ The compose file expects only explicit host path bindings from `.env`:
 
 - `LARK_CLI_CONFIG_DIR`
 - `CODEX_HOME`
+- `SSH_DIR`
 - `KNOWLEDGEBASE_DIR`
 - `MODELS_DIR`
 
@@ -166,7 +167,7 @@ Set `[codex].enabled = true` after confirming the transcript path looks right.
 
 With `auto_kb_write = false`, Codex runs in read-only mode and produces an import plan. With `auto_kb_write = true`, Codex can edit the knowledgebase repo directly.
 
-The prompt is intentionally short and tells Codex to read `AGENTS.md` and local context instead of encoding knowledgebase conventions in this service. The knowledgebase path should be a real git repo; successful write runs are expected to self-check, commit, and attempt `git push origin main`.
+The prompt is intentionally short and tells Codex to read `AGENTS.md` and local context instead of encoding knowledgebase conventions in this service. The knowledgebase path should be a real git repo; successful write runs are expected to self-check, commit, and attempt `git push origin main`. Mount `SSH_DIR` so the worker has the GitHub key needed for that push.
 
 ## Useful Commands
 

@@ -38,6 +38,7 @@ The containers should own the application runtime. Host paths are only for:
    - `LARK_CLI_CONFIG_DIR=/path/to/.config/lark-cli`
    - `LARK_CLI_DATA_DIR=/path/to/.local/share`
    - `CODEX_HOME=/path/to/.codex`
+   - `SSH_DIR=/path/to/.ssh`
 5. Existing knowledgebase:
    - `KNOWLEDGEBASE_DIR=/path/to/projects/knowledgebase`
 6. Existing model directory or a populated project `models/` directory:
