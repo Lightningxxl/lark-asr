@@ -67,6 +67,8 @@ prompt_template = """
 
 请根据仓库内已有约定处理这份转写稿。
 不要在本提示里假设具体放置方法或处理细则；以知识库仓库内容为准。
+完成后请在知识库仓库内自检变更，创建 git commit，并尝试 git push origin main。
+如果 push 失败，请保留本地 commit，并在输出中说明失败原因。
 """
 
 [[project]]
