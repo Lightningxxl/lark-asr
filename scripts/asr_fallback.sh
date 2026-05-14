@@ -44,6 +44,10 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON="${LARK_ASR_PYTHON:-python3}"
 DEVICE="${LARK_ASR_DEVICE:-cuda}"
 FUNASR_DEVICE="${LARK_ASR_FUNASR_DEVICE:-cuda:0}"
+FUNASR_MODEL="${LARK_ASR_FUNASR_MODEL:-iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch}"
+FUNASR_VAD_MODEL="${LARK_ASR_FUNASR_VAD_MODEL:-fsmn-vad}"
+FUNASR_PUNC_MODEL="${LARK_ASR_FUNASR_PUNC_MODEL:-ct-punc}"
+FUNASR_SPK_MODEL="${LARK_ASR_FUNASR_SPK_MODEL:-cam++}"
 WHISPER_MODEL="${LARK_ASR_WHISPER_MODEL:-large-v3}"
 WHISPER_MODEL_DIR="${LARK_ASR_WHISPER_MODEL_DIR:-}"
 COMPUTE_TYPE="${LARK_ASR_COMPUTE_TYPE:-float16}"
@@ -65,6 +69,10 @@ funasr_ok=0
 mkdir -p "$FUNASR_DIR"
 if "$PYTHON" "$SCRIPT_DIR/transcribe_funasr.py" "$INPUT" \
   --out-dir "$FUNASR_DIR" \
+  --model "$FUNASR_MODEL" \
+  --vad-model "$FUNASR_VAD_MODEL" \
+  --punc-model "$FUNASR_PUNC_MODEL" \
+  --spk-model "$FUNASR_SPK_MODEL" \
   --device "$FUNASR_DEVICE"; then
   funasr_ok=1
 else
@@ -122,4 +130,3 @@ fi
 
 echo "no ASR transcript was produced" >&2
 exit 1
-

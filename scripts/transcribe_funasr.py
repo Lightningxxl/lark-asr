@@ -114,7 +114,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("audio")
     parser.add_argument("--out-dir", required=True)
-    parser.add_argument("--model", default="iic/SenseVoiceSmall")
+    parser.add_argument(
+        "--model",
+        default="iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+    )
     parser.add_argument("--vad-model", default="fsmn-vad")
     parser.add_argument("--punc-model", default="ct-punc")
     parser.add_argument("--spk-model", default="cam++")

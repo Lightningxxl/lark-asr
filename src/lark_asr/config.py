@@ -29,6 +29,10 @@ class LarkConfig:
 class PipelineConfig:
     transcript_first: bool = True
     local_asr_fallback: bool = True
+    force_local_asr: bool = False
+    partial_transcript_fallback: bool = True
+    minimum_transcript_coverage_ratio: float = 0.8
+    probe_media_duration_for_transcript_check: bool = True
     resolve_retries: tuple[str, ...] = ("1m", "5m", "15m", "30m")
     minimum_transcript_chars: int = 80
     auto_kb_write: bool = False
@@ -106,6 +110,14 @@ def load_config(path: str | Path) -> Config:
     pipeline = PipelineConfig(
         transcript_first=bool(pipeline_raw.get("transcript_first", True)),
         local_asr_fallback=bool(pipeline_raw.get("local_asr_fallback", True)),
+        force_local_asr=bool(pipeline_raw.get("force_local_asr", False)),
+        partial_transcript_fallback=bool(pipeline_raw.get("partial_transcript_fallback", True)),
+        minimum_transcript_coverage_ratio=float(
+            pipeline_raw.get("minimum_transcript_coverage_ratio", 0.8)
+        ),
+        probe_media_duration_for_transcript_check=bool(
+            pipeline_raw.get("probe_media_duration_for_transcript_check", True)
+        ),
         resolve_retries=tuple(pipeline_raw.get("resolve_retries", ["1m", "5m", "15m", "30m"])),
         minimum_transcript_chars=int(pipeline_raw.get("minimum_transcript_chars", 80)),
         auto_kb_write=bool(pipeline_raw.get("auto_kb_write", False)),
