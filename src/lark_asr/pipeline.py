@@ -265,6 +265,7 @@ class Pipeline:
             command,
             cwd=self.config.paths.knowledgebase_dir,
             env=self.lark.env(),
+            stdin=subprocess.DEVNULL,
             text=True,
             capture_output=True,
             check=False,
