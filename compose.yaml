@@ -59,5 +59,6 @@ services:
       - ${LARK_CLI_DATA_DIR:?set LARK_CLI_DATA_DIR in .env}:/secrets/lark-cli-data
       - ${CODEX_HOME:?set CODEX_HOME in .env}:/home/app/.codex
       - ${SSH_DIR:?set SSH_DIR in .env}:/home/app/.ssh:ro
+      - ${SSH_DIR:?set SSH_DIR in .env}:/home/node/.ssh:ro
       - ${KNOWLEDGEBASE_DIR:?set KNOWLEDGEBASE_DIR in .env}:/knowledgebase
       - ${MODELS_DIR:-./models}:/models
