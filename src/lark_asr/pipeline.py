@@ -250,7 +250,7 @@ class Pipeline:
             "--skip-git-repo-check",
         ]
         if self.config.pipeline.auto_kb_write:
-            command.append("--full-auto")
+            command.append("--dangerously-bypass-approvals-and-sandbox")
         else:
             command.extend(["--sandbox", sandbox])
         if self.config.codex.model:
