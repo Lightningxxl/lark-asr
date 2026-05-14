@@ -4,7 +4,7 @@ import tempfile
 import textwrap
 import unittest
 
-from lark_asr.config import CodexConfig, Config, LarkConfig, PathsConfig, PipelineConfig
+from lark_asr.config import AsrConfig, CodexConfig, Config, LarkConfig, PathsConfig, PipelineConfig
 from lark_asr.events import seed_from_manual
 from lark_asr.pipeline import Pipeline
 from lark_asr.store import Store
@@ -141,6 +141,171 @@ class PipelineTest(unittest.TestCase):
                 self.assertIn("--skip-git-repo-check", command)
                 self.assertNotIn('"-a"', command)
                 self.assertNotIn("--sandbox", command)
+            finally:
+                store.close()
+
+    def test_partial_feishu_transcript_falls_back_to_local_asr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fake_cli = root / "fake-lark-cli"
+            fake_cli.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env python3
+                    import pathlib
+                    import sys
+
+                    args = sys.argv[1:]
+                    if args[:2] == ["vc", "+notes"]:
+                        output = pathlib.Path(args[args.index("--output-dir") + 1])
+                        output.mkdir(parents=True, exist_ok=True)
+                        (output / "transcript.txt").write_text(
+                            "2026-05-14 20:03:03 CST|16分钟 14秒\\n\\n"
+                            "Shiki 00:00:00.160\\n开场。\\n\\n"
+                            "RX 00:04:59.990\\n飞书只给到了前五分钟。\\n",
+                            encoding="utf-8",
+                        )
+                        print('{"ok": true}')
+                        raise SystemExit(0)
+                    if args[:2] == ["minutes", "+download"]:
+                        output = pathlib.Path(args[args.index("--output") + 1])
+                        output.mkdir(parents=True, exist_ok=True)
+                        (output / "recording.m4a").write_bytes(b"fake audio")
+                        print('{"ok": true}')
+                        raise SystemExit(0)
+                    raise SystemExit(2)
+                    """
+                ),
+                encoding="utf-8",
+            )
+            os.chmod(fake_cli, 0o755)
+
+            fake_asr = root / "fake-asr.sh"
+            fake_asr.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env bash
+                    set -euo pipefail
+                    out_dir=""
+                    while [ "$#" -gt 0 ]; do
+                      case "$1" in
+                        --output-dir) out_dir="$2"; shift 2 ;;
+                        *) shift ;;
+                      esac
+                    done
+                    mkdir -p "$out_dir"
+                    printf '本地 ASR 完整转写，覆盖完整会议内容，因此应该进入知识库处理。\\n' > "$out_dir/transcript.md"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            os.chmod(fake_asr, 0o755)
+
+            config = Config(
+                paths=PathsConfig(
+                    state_dir=root / "data",
+                    work_dir=root / "work",
+                    knowledgebase_dir=root / "kb",
+                ),
+                lark=LarkConfig(cli=str(fake_cli)),
+                pipeline=PipelineConfig(minimum_transcript_chars=20),
+                asr=AsrConfig(
+                    enabled=True,
+                    command=f"{fake_asr} --input {{media_path}} --output-dir {{job_dir}}/local_asr",
+                    output_glob="local_asr/**/*.md",
+                ),
+            )
+            config.ensure_dirs()
+            store = Store(config.db_path)
+            try:
+                store.init()
+                job = store.enqueue_seed(seed_from_manual(minute_token="obcn_partial"))
+                count = Pipeline(config, store).process_due_once()
+                self.assertEqual(count, 1)
+                updated = store.get(job.id)
+                self.assertIsNotNone(updated)
+                assert updated is not None
+                self.assertEqual(updated.status, "completed")
+                self.assertIn("local_asr", updated.transcript_path)
+                self.assertTrue(Path(updated.media_path).exists())
+            finally:
+                store.close()
+
+    def test_force_local_asr_skips_feishu_transcript(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fake_cli = root / "fake-lark-cli"
+            fake_cli.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env python3
+                    import pathlib
+                    import sys
+
+                    args = sys.argv[1:]
+                    if args[:2] == ["vc", "+notes"]:
+                        raise SystemExit(42)
+                    if args[:2] == ["minutes", "+download"]:
+                        output = pathlib.Path(args[args.index("--output") + 1])
+                        output.mkdir(parents=True, exist_ok=True)
+                        (output / "recording.m4a").write_bytes(b"fake audio")
+                        print('{"ok": true}')
+                        raise SystemExit(0)
+                    raise SystemExit(2)
+                    """
+                ),
+                encoding="utf-8",
+            )
+            os.chmod(fake_cli, 0o755)
+
+            fake_asr = root / "fake-asr.sh"
+            fake_asr.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env bash
+                    set -euo pipefail
+                    out_dir=""
+                    while [ "$#" -gt 0 ]; do
+                      case "$1" in
+                        --output-dir) out_dir="$2"; shift 2 ;;
+                        *) shift ;;
+                      esac
+                    done
+                    mkdir -p "$out_dir"
+                    printf '强制本地 ASR 转写，跳过飞书文本结果，直接使用本地音频。\\n' > "$out_dir/transcript.md"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            os.chmod(fake_asr, 0o755)
+
+            config = Config(
+                paths=PathsConfig(
+                    state_dir=root / "data",
+                    work_dir=root / "work",
+                    knowledgebase_dir=root / "kb",
+                ),
+                lark=LarkConfig(cli=str(fake_cli)),
+                pipeline=PipelineConfig(minimum_transcript_chars=20, force_local_asr=True),
+                asr=AsrConfig(
+                    enabled=True,
+                    command=f"{fake_asr} --input {{media_path}} --output-dir {{job_dir}}/local_asr",
+                    output_glob="local_asr/**/*.md",
+                ),
+            )
+            config.ensure_dirs()
+            store = Store(config.db_path)
+            try:
+                store.init()
+                job = store.enqueue_seed(seed_from_manual(minute_token="obcn_force"))
+                count = Pipeline(config, store).process_due_once()
+                self.assertEqual(count, 1)
+                updated = store.get(job.id)
+                self.assertIsNotNone(updated)
+                assert updated is not None
+                self.assertEqual(updated.status, "completed")
+                self.assertIn("local_asr", updated.transcript_path)
+                self.assertFalse((root / "work" / job.id / "feishu_notes").exists())
             finally:
                 store.close()
 

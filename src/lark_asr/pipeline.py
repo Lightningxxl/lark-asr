@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
@@ -22,6 +23,27 @@ from .timeutil import after_duration, now_iso
 
 TEXT_EXTENSIONS = {".md", ".txt", ".srt", ".vtt"}
 MEDIA_EXTENSIONS = {".m4a", ".mp3", ".wav", ".aac", ".flac", ".mp4", ".mov", ".mkv"}
+
+
+@dataclass(frozen=True)
+class TranscriptCoverage:
+    coverage_seconds: float | None
+    duration_seconds: float | None
+    coverage_ratio: float | None
+    minimum_ratio: float
+
+    @property
+    def is_partial(self) -> bool:
+        return self.coverage_ratio is not None and self.coverage_ratio < self.minimum_ratio
+
+    def log_payload(self) -> dict[str, Any]:
+        return {
+            "coverage_seconds": self.coverage_seconds,
+            "duration_seconds": self.duration_seconds,
+            "coverage_ratio": self.coverage_ratio,
+            "minimum_ratio": self.minimum_ratio,
+            "is_partial": self.is_partial,
+        }
 
 
 class Pipeline:
@@ -53,23 +75,64 @@ class Pipeline:
         if not job.minute_token and (job.meeting_id or job.calendar_event_id):
             job = self.resolve_minute_token(job, job_dir)
 
-        if job.transcript_path and Path(job.transcript_path).exists():
+        if (
+            job.transcript_path
+            and Path(job.transcript_path).exists()
+            and not self.config.pipeline.force_local_asr
+        ):
             self.run_codex_or_complete(job, Path(job.transcript_path))
             return
 
-        if self.config.pipeline.transcript_first and job.minute_token:
+        media_for_asr: Path | None = None
+        transcript_was_partial = False
+        if (
+            self.config.pipeline.transcript_first
+            and job.minute_token
+            and not self.config.pipeline.force_local_asr
+        ):
             transcript = self.fetch_feishu_transcript(job, job_dir)
             if transcript:
-                self.store.update(job.id, transcript_path=str(transcript))
-                job = self.store.get(job.id) or job
-                self.run_codex_or_complete(job, transcript)
-                return
-            if self.should_wait_for_transcript(job):
+                coverage = transcript_coverage(
+                    transcript,
+                    minimum_ratio=self.config.pipeline.minimum_transcript_coverage_ratio,
+                )
+                if (
+                    self.config.pipeline.partial_transcript_fallback
+                    and coverage.duration_seconds is None
+                    and coverage.coverage_seconds is not None
+                    and self.config.pipeline.probe_media_duration_for_transcript_check
+                    and self.config.pipeline.local_asr_fallback
+                ):
+                    media_for_asr = Path(job.media_path) if job.media_path else self.download_media(job, job_dir)
+                    if media_for_asr and media_for_asr.exists():
+                        self.store.update(job.id, media_path=str(media_for_asr))
+                        coverage = transcript_coverage(
+                            transcript,
+                            minimum_ratio=self.config.pipeline.minimum_transcript_coverage_ratio,
+                            duration_seconds=media_duration_seconds(media_for_asr),
+                        )
+
+                if self.config.pipeline.partial_transcript_fallback and coverage.is_partial:
+                    transcript_was_partial = True
+                    self.store.log(
+                        job.id,
+                        "warning",
+                        "Feishu transcript appears partial; falling back to local ASR",
+                        {"path": str(transcript), **coverage.log_payload()},
+                    )
+                else:
+                    self.store.update(job.id, transcript_path=str(transcript))
+                    job = self.store.get(job.id) or job
+                    self.run_codex_or_complete(job, transcript)
+                    return
+            if not transcript_was_partial and self.should_wait_for_transcript(job):
                 self.schedule_transcript_retry(job)
                 return
+        elif self.config.pipeline.force_local_asr:
+            self.store.log(job.id, "info", "force_local_asr enabled; skipping Feishu transcript")
 
         if self.config.pipeline.local_asr_fallback:
-            media = Path(job.media_path) if job.media_path else self.download_media(job, job_dir)
+            media = media_for_asr or (Path(job.media_path) if job.media_path else self.download_media(job, job_dir))
             if media and media.exists():
                 self.store.update(job.id, media_path=str(media))
                 transcript = self.run_asr(job, media, job_dir)
@@ -324,6 +387,77 @@ def find_media_file(base: Path) -> Path | None:
         return None
     candidates.sort(key=lambda item: item.stat().st_mtime, reverse=True)
     return candidates[0]
+
+
+def transcript_coverage(
+    transcript_path: Path,
+    *,
+    minimum_ratio: float,
+    duration_seconds: float | None = None,
+) -> TranscriptCoverage:
+    try:
+        text = transcript_path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        text = ""
+    coverage = max_relative_timestamp_seconds(text)
+    duration = duration_seconds if duration_seconds is not None else declared_duration_seconds(text)
+    ratio = None
+    if coverage is not None and duration and duration > 0:
+        ratio = min(coverage / duration, 1.0)
+    return TranscriptCoverage(
+        coverage_seconds=coverage,
+        duration_seconds=duration,
+        coverage_ratio=ratio,
+        minimum_ratio=minimum_ratio,
+    )
+
+
+def max_relative_timestamp_seconds(text: str) -> float | None:
+    values: list[float] = []
+    for match in re.finditer(r"(?<!\d)(\d{1,2}):([0-5]\d):([0-5]\d)(?:\.(\d+))?(?!\d)", text):
+        hours = int(match.group(1))
+        if hours >= 8:
+            continue
+        millis = float(f"0.{match.group(4)}") if match.group(4) else 0.0
+        values.append((hours * 3600) + (int(match.group(2)) * 60) + int(match.group(3)) + millis)
+    return max(values) if values else None
+
+
+def declared_duration_seconds(text: str) -> float | None:
+    match = re.search(r"(\d{1,4})\s*分钟(?:\s*(\d{1,2}(?:\.\d+)?)\s*秒)?", text)
+    if match:
+        return (int(match.group(1)) * 60) + float(match.group(2) or 0)
+    match = re.search(r"(\d{1,4})\s*m(?:in)?\s*(\d{1,2}(?:\.\d+)?)?\s*s?", text, re.IGNORECASE)
+    if match:
+        return (int(match.group(1)) * 60) + float(match.group(2) or 0)
+    return None
+
+
+def media_duration_seconds(media_path: Path) -> float | None:
+    try:
+        completed = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(media_path),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None
+    if completed.returncode != 0:
+        return None
+    try:
+        return float(completed.stdout.strip())
+    except ValueError:
+        return None
 
 
 def extract_transcript_from_json_artifacts(

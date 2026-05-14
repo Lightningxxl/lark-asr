@@ -21,6 +21,10 @@ LARKSUITE_CLI_NO_UPDATE_NOTIFIER = "1"
 [pipeline]
 transcript_first = true
 local_asr_fallback = true
+force_local_asr = false
+partial_transcript_fallback = true
+minimum_transcript_coverage_ratio = 0.8
+probe_media_duration_for_transcript_check = true
 resolve_retries = ["1m", "5m", "15m", "30m"]
 minimum_transcript_chars = 80
 auto_kb_write = false
@@ -33,6 +37,7 @@ env \
   LARK_ASR_WHISPER_MODEL=/models/whisper-large-v3-ct2-float16 \
   LARK_ASR_USE_WHISPER=1 \
   LARK_ASR_DEVICE=cuda \
+  LARK_ASR_FUNASR_MODEL=iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch \
   LARK_ASR_FUNASR_DEVICE=cuda:0 \
   /app/scripts/asr_fallback.sh \
   --input {media_path} \

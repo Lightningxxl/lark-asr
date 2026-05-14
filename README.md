@@ -7,10 +7,10 @@ The intended flow is:
 1. Listen to Feishu events with `lark-cli event +subscribe`.
 2. Resolve `minute_token` from a minutes URL, meeting ID, or calendar event ID.
 3. Prefer Feishu's generated transcript.
-4. If Feishu has media but no transcript, run a local ASR command on FF1.
+4. If Feishu has media but no usable transcript, run a local ASR command on FF1.
 5. Hand the transcript to Codex inside the knowledgebase repo.
 
-This deliberately uses the presence of transcript/media as the source of truth. It does not guess whether the Feishu quota has been exhausted.
+This deliberately uses transcript/media artifacts as the source of truth. When Feishu returns a transcript, the worker checks whether the last transcript timestamp covers enough of the declared or probed media duration. If the transcript appears partial, it downloads the media and falls back to local ASR. If you already know the Feishu quota is exhausted, set `force_local_asr = true` under `[pipeline]` to skip Feishu transcript import and transcribe locally.
 
 ## Quick Start On FF1
 
@@ -155,6 +155,7 @@ Useful environment knobs for the ASR command:
 - `LARK_ASR_WHISPER_MODEL_DIR`
 - `LARK_ASR_USE_WHISPER`
 - `LARK_ASR_DEVICE`
+- `LARK_ASR_FUNASR_MODEL`
 - `LARK_ASR_FUNASR_DEVICE`
 
 The current FF1 host has an existing ASR environment at `/home/xavierx/codex-transcript-20260512/.venv/bin/python` and a local faster-whisper CT2 model at `/home/xavierx/codex-transcript-20260512/models/AI-ModelScope/whisper-large-v3-ct2-float16`. Docker should reuse the model files via `MODELS_DIR`, not mount the old virtualenv.
