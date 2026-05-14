@@ -247,6 +247,7 @@ class Pipeline:
             str(self.config.paths.knowledgebase_dir),
             "--add-dir",
             str(job_dir),
+            "--skip-git-repo-check",
         ]
         if self.config.pipeline.auto_kb_write:
             command.append("--full-auto")

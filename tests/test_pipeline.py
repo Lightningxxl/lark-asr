@@ -137,6 +137,7 @@ class PipelineTest(unittest.TestCase):
 
                 command = (knowledgebase_dir / "codex-args.json").read_text(encoding="utf-8")
                 self.assertIn("--full-auto", command)
+                self.assertIn("--skip-git-repo-check", command)
                 self.assertNotIn('"-a"', command)
                 self.assertNotIn("--sandbox", command)
             finally:
