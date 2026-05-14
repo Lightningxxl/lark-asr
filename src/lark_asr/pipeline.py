@@ -247,11 +247,11 @@ class Pipeline:
             str(self.config.paths.knowledgebase_dir),
             "--add-dir",
             str(job_dir),
-            "--sandbox",
-            sandbox,
-            "-a",
-            "never",
         ]
+        if self.config.pipeline.auto_kb_write:
+            command.append("--full-auto")
+        else:
+            command.extend(["--sandbox", sandbox])
         if self.config.codex.model:
             command.extend(["-m", self.config.codex.model])
         if self.config.codex.reasoning_effort:
