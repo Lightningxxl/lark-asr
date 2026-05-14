@@ -38,6 +38,7 @@ The containers should own the application runtime. Host paths are only for:
    - `LARK_CLI_CONFIG_DIR=/home/xavierx/.config/lark-cli-token-only`
    - `LARK_CLI_DATA_DIR=/home/xavierx/.local/share`
    - `CODEX_HOME=/home/xavierx/.codex`
+   - `SSH_DIR=/home/xavierx/.ssh`
 5. Existing knowledgebase:
    - `KNOWLEDGEBASE_DIR=/home/xavierx/projects/xfx_knowledge_base`
 6. Existing model directory or a populated project `models/` directory:

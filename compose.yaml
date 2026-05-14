@@ -48,6 +48,7 @@ services:
       HOME: /home/app
       LARK_CLI_NO_PROXY: "1"
       PYTHONUNBUFFERED: "1"
+      GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=accept-new"
       HF_HOME: /models/.cache/huggingface
       MODELSCOPE_CACHE: /models/.cache/modelscope
     volumes:
@@ -57,5 +58,6 @@ services:
       - ${LARK_CLI_CONFIG_DIR:?set LARK_CLI_CONFIG_DIR in .env}:/secrets/lark-cli
       - ${LARK_CLI_DATA_DIR:?set LARK_CLI_DATA_DIR in .env}:/secrets/lark-cli-data
       - ${CODEX_HOME:?set CODEX_HOME in .env}:/home/app/.codex
+      - ${SSH_DIR:?set SSH_DIR in .env}:/home/app/.ssh:ro
       - ${KNOWLEDGEBASE_DIR:?set KNOWLEDGEBASE_DIR in .env}:/knowledgebase
       - ${MODELS_DIR:-./models}:/models
