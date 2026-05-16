@@ -59,12 +59,16 @@ prompt_template = """
 会议转写稿路径:
 {transcript_path}
 
+任务工作目录:
+{job_dir}
+
 会议元数据:
 - minute_token: {minute_token}
 - meeting_id: {meeting_id}
 - calendar_event_id: {calendar_event_id}
 - project_hint: {project_hint}
 
+本地 ASR 转写稿不一定包含会议日期；如工作目录中存在 feishu_notes/ 或其他会议元数据，请优先使用其中的真实会议标题、开始时间和时长，不要用当前运行日期替代会议日期。
 请根据仓库内已有约定处理这份转写稿。
 不要在本提示里假设具体放置方法或处理细则；以知识库仓库内容为准。
 完成后请在知识库仓库内自检变更，创建 git commit，并尝试 git push origin main。
