@@ -194,7 +194,10 @@ class PipelineTest(unittest.TestCase):
                       esac
                     done
                     mkdir -p "$out_dir"
-                    printf '本地 ASR 完整转写，覆盖完整会议内容，因此应该进入知识库处理。\\n' > "$out_dir/transcript.md"
+                    mkdir -p "$out_dir/funasr"
+                    printf 'FunASR 中间稿更长但不是最终稿。%.0s\\n' {1..20} > "$out_dir/funasr/raw.md"
+                    printf '本地 ASR 最终转写，覆盖完整会议内容，因此应该进入知识库处理。\\n' > "$out_dir/transcript.md"
+                    echo "$out_dir/transcript.md"
                     """
                 ),
                 encoding="utf-8",
@@ -227,6 +230,7 @@ class PipelineTest(unittest.TestCase):
                 assert updated is not None
                 self.assertEqual(updated.status, "completed")
                 self.assertIn("local_asr", updated.transcript_path)
+                self.assertTrue(updated.transcript_path.endswith("local_asr/transcript.md"))
                 self.assertTrue(Path(updated.media_path).exists())
             finally:
                 store.close()

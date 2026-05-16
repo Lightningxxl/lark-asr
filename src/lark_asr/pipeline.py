@@ -265,11 +265,17 @@ class Pipeline:
                 {"returncode": completed.returncode, "stderr": completed.stderr[-1000:]},
             )
             return None
-        transcript = find_best_text_file(
+        transcript = transcript_path_from_stdout(
+            completed.stdout,
             job_dir,
             self.config.pipeline.minimum_transcript_chars,
-            pattern=self.config.asr.output_glob,
         )
+        if not transcript:
+            transcript = find_best_text_file(
+                job_dir,
+                self.config.pipeline.minimum_transcript_chars,
+                pattern=self.config.asr.output_glob,
+            )
         if not transcript:
             self.store.update(job.id, status="failed", last_error="ASR command produced no transcript")
             self.store.log(job.id, "error", "ASR produced no transcript")
@@ -375,6 +381,29 @@ def find_best_text_file(base: Path, minimum_chars: int, pattern: str = "**/*") -
         return None
     candidates.sort(reverse=True)
     return candidates[0][2]
+
+
+def transcript_path_from_stdout(stdout: str, job_dir: Path, minimum_chars: int) -> Path | None:
+    for line in reversed(stdout.splitlines()):
+        value = line.strip()
+        if not value:
+            continue
+        path = Path(value)
+        if not path.is_absolute():
+            path = job_dir / path
+        if usable_text_file(path, minimum_chars):
+            return path
+    return None
+
+
+def usable_text_file(path: Path, minimum_chars: int) -> bool:
+    if not path.is_file() or path.suffix.lower() not in TEXT_EXTENSIONS:
+        return False
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
+    return len(re.sub(r"\s+", "", text)) >= minimum_chars
 
 
 def find_media_file(base: Path) -> Path | None:
