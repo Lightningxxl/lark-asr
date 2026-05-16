@@ -209,7 +209,7 @@ class Pipeline:
         if not job.minute_token:
             return None
         media_dir = job_dir / "media"
-        result = self.lark.download_media(job.minute_token, media_dir)
+        result = self.lark.download_media(job.minute_token, media_dir / "recording.m4a")
         write_command_artifacts(result, media_dir, "download")
         media = find_media_file(media_dir)
         if media:

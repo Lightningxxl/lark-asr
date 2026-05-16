@@ -169,8 +169,8 @@ class PipelineTest(unittest.TestCase):
                         raise SystemExit(0)
                     if args[:2] == ["minutes", "+download"]:
                         output = pathlib.Path(args[args.index("--output") + 1])
-                        output.mkdir(parents=True, exist_ok=True)
-                        (output / "recording.m4a").write_bytes(b"fake audio")
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        output.write_bytes(b"fake audio")
                         print('{"ok": true}')
                         raise SystemExit(0)
                     raise SystemExit(2)
@@ -247,8 +247,8 @@ class PipelineTest(unittest.TestCase):
                         raise SystemExit(42)
                     if args[:2] == ["minutes", "+download"]:
                         output = pathlib.Path(args[args.index("--output") + 1])
-                        output.mkdir(parents=True, exist_ok=True)
-                        (output / "recording.m4a").write_bytes(b"fake audio")
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        output.write_bytes(b"fake audio")
                         print('{"ok": true}')
                         raise SystemExit(0)
                     raise SystemExit(2)

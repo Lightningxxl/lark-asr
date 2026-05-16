@@ -71,10 +71,10 @@ class LarkClient:
         ]
         return self.run(command, cwd=cwd)
 
-    def download_media(self, minute_token: str, output_dir: Path) -> CommandResult:
-        output_dir.mkdir(parents=True, exist_ok=True)
-        cwd = output_dir.parent.resolve()
-        output_arg = output_dir.name
+    def download_media(self, minute_token: str, output_path: Path) -> CommandResult:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        cwd = output_path.parent.resolve()
+        output_arg = output_path.name
         command = [
             self.config.lark.cli,
             "minutes",
