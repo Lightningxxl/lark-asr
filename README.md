@@ -5,10 +5,11 @@ Feishu/Lark transcript-first meeting ingestion for FF1.
 The intended flow is:
 
 1. Listen to Feishu events with `lark-cli event +subscribe`.
-2. Resolve `minute_token` from a minutes URL, meeting ID, or calendar event ID.
-3. Prefer Feishu's generated transcript.
-4. If Feishu has media but no usable transcript, run a local ASR command on FF1.
-5. Hand the transcript to Codex inside the knowledgebase repo.
+2. Backfill recent Feishu minutes with `lark-cli minutes +search --as user`, because event subscription is bot-only and can miss user-owned recordings.
+3. Resolve `minute_token` from a minutes URL, meeting ID, calendar event ID, or minutes search result.
+4. Prefer Feishu's generated transcript.
+5. If Feishu has media but no usable transcript, run a local ASR command on FF1.
+6. Hand the transcript to Codex inside the knowledgebase repo.
 
 This deliberately uses transcript/media artifacts as the source of truth. When Feishu returns a transcript, the worker checks whether the last transcript timestamp covers enough of the declared or probed media duration. If the transcript appears partial, it downloads the media and falls back to local ASR. If you already know the Feishu quota is exhausted, set `force_local_asr = true` under `[pipeline]` to skip Feishu transcript import and transcribe locally.
 
@@ -29,7 +30,7 @@ docker compose logs -f
 
 The Compose deployment uses:
 
-- `hook`: listens to Lark/Feishu events.
+- `hook`: listens to Lark/Feishu bot events and periodically backfills recent user-visible minutes.
 - `worker`: resolves transcripts, runs local ASR fallback, and invokes Codex.
 - `config/config.toml`: runtime behavior.
 - `.env`: host path bindings for auth, knowledgebase, and models.

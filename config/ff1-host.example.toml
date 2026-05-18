@@ -13,6 +13,11 @@ event_as = "bot"
 api_as = "user"
 event_filter = "im\\.message|vc\\.|calendar\\."
 event_types = ""
+minutes_backfill_enabled = true
+minutes_backfill_interval_seconds = 300
+minutes_backfill_window_minutes = 720
+minutes_backfill_page_size = 20
+minutes_backfill_query = ""
 no_proxy = true
 path_prefixes = [
   "/home/xavierx/.local/share/mise/installs/node/22.22.2/bin",
