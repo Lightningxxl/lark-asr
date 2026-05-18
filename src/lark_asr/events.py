@@ -96,6 +96,27 @@ def seeds_from_event(event: dict[str, Any], projects: Iterable[ProjectConfig] = 
     return seeds
 
 
+def seeds_from_minutes_search(data: Any, projects: Iterable[ProjectConfig] = ()) -> list[JobSeed]:
+    seeds: list[JobSeed] = []
+    seen_tokens: set[str] = set()
+    for item in iter_minutes_search_items(data):
+        token = minute_token_from_search_item(item)
+        if not token or token in seen_tokens:
+            continue
+        seen_tokens.add(token)
+        strings = list(iter_strings(item))
+        seeds.append(
+            JobSeed(
+                source="minutes_search",
+                minute_token=token,
+                project_hint=infer_project_hint(" ".join(strings), projects),
+                event_type="minutes.search",
+                metadata=item,
+            )
+        )
+    return seeds
+
+
 def seed_from_manual(
     *,
     minute_token: str = "",
@@ -136,6 +157,45 @@ def extract_minute_tokens(text: str) -> set[str]:
     return tokens
 
 
+def iter_minutes_search_items(data: Any) -> Iterable[dict[str, Any]]:
+    if isinstance(data, dict):
+        payload = data.get("data")
+        if isinstance(payload, dict):
+            items = payload.get("items")
+            if isinstance(items, list):
+                for item in items:
+                    if isinstance(item, dict):
+                        yield item
+                return
+        items = data.get("items")
+        if isinstance(items, list):
+            for item in items:
+                if isinstance(item, dict):
+                    yield item
+            return
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                yield item
+
+
+def minute_token_from_search_item(item: dict[str, Any]) -> str:
+    tokens: set[str] = set()
+    for value in iter_strings(item):
+        tokens.update(extract_minute_tokens(value))
+    for key, value in iter_key_values(item):
+        if not isinstance(value, str):
+            continue
+        normalized = normalize_key(key)
+        if normalized in {"token", "minutetoken", "minuteurltoken"} and looks_like_token(value):
+            tokens.add(value.rstrip(").,，。]】"))
+    return sorted(tokens)[0] if tokens else ""
+
+
+def looks_like_token(value: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z0-9_-]{8,}", value))
+
+
 def infer_project_hint(text: str, projects: Iterable[ProjectConfig]) -> str:
     for project in projects:
         if project.id and project.id in text:
@@ -169,4 +229,3 @@ def iter_key_values(value: Any) -> Iterable[tuple[str, Any]]:
 
 def normalize_key(key: str) -> str:
     return re.sub(r"[^a-z0-9]", "", key.lower())
-

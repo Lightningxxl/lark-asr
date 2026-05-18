@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
+import select
 import shutil
 import subprocess
 import sys
 import time
 
 from .config import Config, load_config
-from .events import extract_minute_tokens, seed_from_manual, seeds_from_event
-from .lark import LarkClient
+from .events import (
+    extract_minute_tokens,
+    seed_from_manual,
+    seeds_from_event,
+    seeds_from_minutes_search,
+)
+from .lark import LarkClient, json_from_stdout
 from .pipeline import Pipeline
 from .store import Store, render_jobs
 
@@ -134,9 +141,27 @@ def hook_command(args: argparse.Namespace) -> None:
             stderr=sys.stderr,
         )
         assert process.stdout is not None
-        for line in process.stdout:
-            process_event_line(line, loaded, store)
-        raise SystemExit(process.wait())
+        next_backfill_at = 0.0
+        while True:
+            if loaded.lark.minutes_backfill_enabled and time.monotonic() >= next_backfill_at:
+                run_minutes_backfill(loaded, store, client)
+                interval = max(30, loaded.lark.minutes_backfill_interval_seconds)
+                next_backfill_at = time.monotonic() + interval
+
+            timeout = 1.0
+            if loaded.lark.minutes_backfill_enabled:
+                timeout = max(0.0, min(timeout, next_backfill_at - time.monotonic()))
+            ready, _, _ = select.select([process.stdout], [], [], timeout)
+            if ready:
+                line = process.stdout.readline()
+                if line:
+                    process_event_line(line, loaded, store)
+                    continue
+
+            if process.poll() is not None:
+                for line in process.stdout.read().splitlines():
+                    process_event_line(line, loaded, store)
+                raise SystemExit(process.returncode or 0)
     finally:
         store.close()
 
@@ -234,6 +259,43 @@ def process_event_line(line: str, config: Config, store: Store) -> None:
     for seed in seeds:
         job = store.enqueue_seed(seed)
         print(f"queued {job.id}")
+
+
+def run_minutes_backfill(config: Config, store: Store, client: LarkClient) -> None:
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(minutes=max(1, config.lark.minutes_backfill_window_minutes))
+    result = client.search_minutes(
+        start=format_lark_datetime(start),
+        end=format_lark_datetime(end),
+        page_size=max(1, config.lark.minutes_backfill_page_size),
+        query=config.lark.minutes_backfill_query,
+        cwd=config.paths.state_dir,
+    )
+    if not result.ok:
+        detail = (result.stderr or result.stdout).strip().replace("\n", " ")
+        print(f"minutes backfill failed: exit={result.returncode} {detail[:800]}", file=sys.stderr)
+        return
+
+    data = json_from_stdout(result)
+    seeds = seeds_from_minutes_search(data, config.projects)
+    queued = 0
+    existing = 0
+    for seed in seeds:
+        if store.get(seed.stable_id):
+            existing += 1
+            continue
+        job = store.enqueue_seed(seed)
+        queued += 1
+        print(f"backfill queued {job.id}")
+    if seeds:
+        print(
+            f"minutes backfill: seen={len(seeds)} queued={queued} existing={existing}",
+            file=sys.stderr,
+        )
+
+
+def format_lark_datetime(value: datetime) -> str:
+    return value.isoformat(timespec="seconds")
 
 
 def command_exists(command: str) -> bool:

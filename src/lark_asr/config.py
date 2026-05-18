@@ -20,6 +20,11 @@ class LarkConfig:
     api_as: str = "user"
     event_filter: str = r"im\.message|vc\.|calendar\."
     event_types: str = ""
+    minutes_backfill_enabled: bool = True
+    minutes_backfill_interval_seconds: int = 300
+    minutes_backfill_window_minutes: int = 720
+    minutes_backfill_page_size: int = 20
+    minutes_backfill_query: str = ""
     no_proxy: bool = True
     path_prefixes: tuple[Path, ...] = ()
     env: dict[str, str] = field(default_factory=dict)
@@ -102,6 +107,13 @@ def load_config(path: str | Path) -> Config:
         api_as=str(lark_raw.get("api_as", "user")),
         event_filter=str(lark_raw.get("event_filter", r"im\.message|vc\.|calendar\.")),
         event_types=str(lark_raw.get("event_types", "")),
+        minutes_backfill_enabled=bool(lark_raw.get("minutes_backfill_enabled", True)),
+        minutes_backfill_interval_seconds=int(
+            lark_raw.get("minutes_backfill_interval_seconds", 300)
+        ),
+        minutes_backfill_window_minutes=int(lark_raw.get("minutes_backfill_window_minutes", 720)),
+        minutes_backfill_page_size=int(lark_raw.get("minutes_backfill_page_size", 20)),
+        minutes_backfill_query=str(lark_raw.get("minutes_backfill_query", "")),
         no_proxy=bool(lark_raw.get("no_proxy", True)),
         path_prefixes=tuple(_path(item) for item in lark_raw.get("path_prefixes", [])),
         env={str(key): str(value) for key, value in lark_raw.get("env", {}).items()},
