@@ -52,6 +52,7 @@ WHISPER_MODEL="${LARK_ASR_WHISPER_MODEL:-large-v3}"
 WHISPER_MODEL_DIR="${LARK_ASR_WHISPER_MODEL_DIR:-}"
 COMPUTE_TYPE="${LARK_ASR_COMPUTE_TYPE:-float16}"
 USE_WHISPER="${LARK_ASR_USE_WHISPER:-1}"
+RESTORE_PUNCTUATION="${LARK_ASR_RESTORE_PUNCTUATION:-1}"
 
 mkdir -p "$OUT_DIR"
 
@@ -104,10 +105,25 @@ whisper_json="$WHISPER_DIR/$STEM.large-v3.json"
 funasr_json="$FUNASR_DIR/$STEM.funasr.json"
 
 if [[ "$whisper_ok" == "1" && "$funasr_ok" == "1" && -f "$whisper_json" && -f "$funasr_json" ]]; then
+  speaker_prefix="$OUT_DIR/transcript.speakers"
   "$PYTHON" "$SCRIPT_DIR/label_whisper_with_speakers.py" \
     --whisper-json "$whisper_json" \
     --speaker-json "$funasr_json" \
-    --out-prefix "$FINAL_PREFIX"
+    --out-prefix "$speaker_prefix"
+  if [[ "$RESTORE_PUNCTUATION" == "1" || "$RESTORE_PUNCTUATION" == "true" ]]; then
+    if "$PYTHON" "$SCRIPT_DIR/restore_punctuation_funasr.py" \
+      --input-json "$speaker_prefix.json" \
+      --out-prefix "$FINAL_PREFIX" \
+      --model "$FUNASR_PUNC_MODEL" \
+      --device "$FUNASR_DEVICE"; then
+      echo "$FINAL_PREFIX.md"
+      exit 0
+    fi
+    echo "warning: punctuation restoration failed; using speaker-labeled Whisper transcript" >&2
+  fi
+  cp "$speaker_prefix.md" "$FINAL_PREFIX.md"
+  cp "$speaker_prefix.txt" "$FINAL_PREFIX.txt" 2>/dev/null || true
+  cp "$speaker_prefix.json" "$FINAL_PREFIX.json" 2>/dev/null || true
   echo "$FINAL_PREFIX.md"
   exit 0
 fi
