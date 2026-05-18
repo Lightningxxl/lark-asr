@@ -146,7 +146,8 @@ The repo includes `scripts/asr_fallback.sh`, which uses bundled helper scripts:
 
 - `transcribe_funasr.py` for FunASR/SenseVoice + VAD + punctuation + CAM++ speaker labels.
 - `transcribe_faster_whisper.py` for Whisper large-v3 text when `faster-whisper` is available.
-- `label_whisper_with_speakers.py` to combine Whisper text with FunASR speaker segments.
+- `label_whisper_with_speakers.py` to preserve Whisper segments and assign FunASR speaker labels.
+- `restore_punctuation_funasr.py` to restore punctuation on the final speaker-labeled Whisper transcript.
 
 Useful environment knobs for the ASR command:
 
@@ -154,6 +155,7 @@ Useful environment knobs for the ASR command:
 - `LARK_ASR_WHISPER_MODEL`
 - `LARK_ASR_WHISPER_MODEL_DIR`
 - `LARK_ASR_USE_WHISPER`
+- `LARK_ASR_RESTORE_PUNCTUATION`
 - `LARK_ASR_DEVICE`
 - `LARK_ASR_FUNASR_MODEL`
 - `LARK_ASR_FUNASR_DEVICE`
