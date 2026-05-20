@@ -308,6 +308,9 @@ class Pipeline:
         codex_dir.mkdir(parents=True, exist_ok=True)
         (codex_dir / "prompt.md").write_text(prompt, encoding="utf-8")
 
+        if self.config.pipeline.auto_kb_write and not self.prepare_knowledgebase_git(job, codex_dir):
+            return
+
         sandbox = "danger-full-access" if self.config.pipeline.auto_kb_write else "read-only"
         command = [
             self.config.codex.cmd,
@@ -358,11 +361,166 @@ class Pipeline:
                 {"returncode": completed.returncode, "stderr": completed.stderr[-1000:]},
             )
             return
+        if self.config.pipeline.auto_kb_write and not self.finalize_knowledgebase_git(job, codex_dir):
+            return
         self.store.update(job.id, status="completed", transcript_path=str(transcript_path))
         self.store.log(job.id, "info", "completed Codex step")
 
     def job_dir(self, job: Job) -> Path:
         return self.config.paths.work_dir / sanitize_filename(job.id)
+
+    def prepare_knowledgebase_git(self, job: Job, codex_dir: Path) -> bool:
+        branch = self.knowledgebase_branch(job, codex_dir)
+        if not branch:
+            return False
+        if not self.ensure_clean_knowledgebase(job, codex_dir, "before Codex"):
+            return False
+        if not self.run_git_or_fail(job, codex_dir, "fetch-before-codex", ["fetch", "origin"]):
+            return False
+        if not self.run_git_or_fail(
+            job,
+            codex_dir,
+            "rebase-before-codex",
+            ["pull", "--rebase", "origin", branch],
+        ):
+            return False
+        self.store.log(job.id, "info", "knowledgebase git synced before Codex", {"branch": branch})
+        return True
+
+    def finalize_knowledgebase_git(self, job: Job, codex_dir: Path) -> bool:
+        branch = self.knowledgebase_branch(job, codex_dir)
+        if not branch:
+            return False
+
+        status = self.run_git(codex_dir, "status-after-codex", ["status", "--porcelain"])
+        if status.returncode != 0:
+            self.fail_git_step(job, "git status after Codex failed", status)
+            return False
+        if status.stdout.strip():
+            if not self.run_git_or_fail(job, codex_dir, "add-codex-changes", ["add", "-A"]):
+                return False
+            if not self.run_git_or_fail(
+                job,
+                codex_dir,
+                "commit-codex-changes",
+                [
+                    "commit",
+                    "-m",
+                    "docs(asr): import meeting transcript",
+                    "-m",
+                    f"Source job: {job.id}",
+                ],
+            ):
+                return False
+
+        if not self.ensure_clean_knowledgebase(job, codex_dir, "before push"):
+            return False
+        if not self.run_git_or_fail(job, codex_dir, "fetch-before-push", ["fetch", "origin"]):
+            return False
+        if not self.run_git_or_fail(
+            job,
+            codex_dir,
+            "rebase-before-push",
+            ["rebase", f"origin/{branch}"],
+        ):
+            return False
+        if not self.run_git_or_fail(
+            job,
+            codex_dir,
+            "push-knowledgebase",
+            ["push", "origin", branch],
+        ):
+            return False
+        if not self.ensure_clean_knowledgebase(job, codex_dir, "after push"):
+            return False
+        self.store.log(job.id, "info", "knowledgebase git pushed", {"branch": branch})
+        return True
+
+    def knowledgebase_branch(self, job: Job, codex_dir: Path) -> str:
+        repo = self.run_git(codex_dir, "rev-parse-work-tree", ["rev-parse", "--is-inside-work-tree"])
+        if repo.returncode != 0 or repo.stdout.strip() != "true":
+            self.fail_git_step(job, "knowledgebase path is not a git repo", repo)
+            return ""
+        branch = self.run_git(codex_dir, "rev-parse-branch", ["rev-parse", "--abbrev-ref", "HEAD"])
+        value = branch.stdout.strip()
+        if branch.returncode != 0 or not value or value == "HEAD":
+            self.fail_git_step(job, "knowledgebase git branch is not usable", branch)
+            return ""
+        return value
+
+    def ensure_clean_knowledgebase(self, job: Job, codex_dir: Path, phase: str) -> bool:
+        status = self.run_git(codex_dir, f"status-{sanitize_filename(phase)}", ["status", "--porcelain"])
+        if status.returncode != 0:
+            self.fail_git_step(job, f"git status failed {phase}", status)
+            return False
+        if status.stdout.strip():
+            self.store.update(
+                job.id,
+                status="failed",
+                last_error=f"knowledgebase has uncommitted changes {phase}",
+            )
+            self.store.log(
+                job.id,
+                "error",
+                "knowledgebase has uncommitted changes",
+                {"phase": phase, "status": status.stdout[-2000:]},
+            )
+            return False
+        return True
+
+    def run_git_or_fail(
+        self,
+        job: Job,
+        codex_dir: Path,
+        label: str,
+        args: list[str],
+    ) -> bool:
+        result = self.run_git(codex_dir, label, args)
+        if result.returncode == 0:
+            return True
+        self.fail_git_step(job, f"git {label} failed", result)
+        return False
+
+    def fail_git_step(self, job: Job, message: str, result: subprocess.CompletedProcess[str]) -> None:
+        self.store.update(job.id, status="failed", last_error=message)
+        self.store.log(
+            job.id,
+            "error",
+            message,
+            {
+                "returncode": result.returncode,
+                "stdout": result.stdout[-1000:],
+                "stderr": result.stderr[-1000:],
+            },
+        )
+
+    def run_git(
+        self,
+        codex_dir: Path,
+        label: str,
+        args: list[str],
+    ) -> subprocess.CompletedProcess[str]:
+        git_dir = codex_dir / "git"
+        git_dir.mkdir(parents=True, exist_ok=True)
+        index = len(list(git_dir.glob("*.command.json"))) + 1
+        stem = f"{index:02d}-{sanitize_filename(label)}"
+        command = ["git", *args]
+        completed = subprocess.run(
+            command,
+            cwd=self.config.paths.knowledgebase_dir,
+            env=self.lark.env(),
+            stdin=subprocess.DEVNULL,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        (git_dir / f"{stem}.stdout.log").write_text(completed.stdout, encoding="utf-8")
+        (git_dir / f"{stem}.stderr.log").write_text(completed.stderr, encoding="utf-8")
+        (git_dir / f"{stem}.command.json").write_text(
+            json.dumps(command, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return completed
 
 
 def find_best_text_file(base: Path, minimum_chars: int, pattern: str = "**/*") -> Path | None:
