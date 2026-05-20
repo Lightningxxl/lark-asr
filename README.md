@@ -171,7 +171,7 @@ Set `[codex].enabled = true` after confirming the transcript path looks right.
 
 With `auto_kb_write = false`, Codex runs in read-only mode and produces an import plan. With `auto_kb_write = true`, Codex can edit the knowledgebase repo directly.
 
-The prompt is intentionally short and tells Codex to read `AGENTS.md` and local context instead of encoding knowledgebase conventions in this service. The knowledgebase path should be a real git repo; successful write runs are expected to self-check, commit, and attempt `git push origin main`. Mount `SSH_DIR` so the worker has the GitHub key needed for that push; the compose file binds it to both the Codex `HOME` path and the container user's OpenSSH path.
+The prompt is intentionally short and tells Codex to read `AGENTS.md` and local context instead of encoding knowledgebase conventions in this service. The knowledgebase path should be a real git repo. For write runs, `lark-asr` now treats Git publication as part of the pipeline: it syncs the knowledgebase before Codex runs, lets Codex edit and commit, then commits any remaining Codex changes, rebases on `origin/<branch>`, and pushes. A push or rebase failure leaves the job failed with git artifacts under the job `codex/git/` directory. Mount `SSH_DIR` so the worker has the GitHub key needed for that push; the compose file binds it to both the Codex `HOME` path and the container user's OpenSSH path.
 
 ## Useful Commands
 
