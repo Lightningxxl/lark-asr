@@ -6,6 +6,7 @@ knowledgebase_dir = "/knowledgebase"
 [lark]
 cli = "lark-cli"
 profile = ""
+event_enabled = false
 event_as = "bot"
 api_as = "user"
 event_filter = "im\\.message|vc\\.|calendar\\."

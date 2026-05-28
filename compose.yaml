@@ -14,7 +14,7 @@ x-lark-asr-common: &lark-asr-common
     - ${LARK_CLI_DATA_DIR:?set LARK_CLI_DATA_DIR in .env}:/secrets/lark-cli-data
 
 services:
-  hook:
+  poller:
     <<: *lark-asr-common
     image: ${LARK_ASR_APP_IMAGE:-lark-asr/app:local}
     build:
@@ -27,7 +27,7 @@ services:
         DEBIAN_APT_MIRROR: ${DEBIAN_APT_MIRROR:-http://mirrors.tuna.tsinghua.edu.cn/debian}
         DEBIAN_SECURITY_MIRROR: ${DEBIAN_SECURITY_MIRROR:-http://mirrors.tuna.tsinghua.edu.cn/debian-security}
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
-    command: ["hook", "--config", "/config/config.toml"]
+    command: ["poll", "--config", "/config/config.toml"]
 
   worker:
     <<: *lark-asr-common
