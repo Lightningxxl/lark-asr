@@ -9,6 +9,7 @@ knowledgebase_dir = "/home/xavierx/projects/xfx_knowledge_base"
 [lark]
 cli = "/home/xavierx/.local/share/mise/installs/node/22.22.2/bin/lark-cli"
 profile = ""
+event_enabled = false
 event_as = "bot"
 api_as = "user"
 event_filter = "im\\.message|vc\\.|calendar\\."

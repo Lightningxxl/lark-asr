@@ -23,10 +23,12 @@ fi
 
 "$ROOT/bin/lark-asr" init --config "$CONFIG"
 mkdir -p "$SYSTEMD_USER_DIR"
+systemctl --user disable --now lark-asr-hook.service 2>/dev/null || true
+rm -f "$SYSTEMD_USER_DIR/lark-asr-hook.service"
 
-cat > "$SYSTEMD_USER_DIR/lark-asr-hook.service" <<SERVICE
+cat > "$SYSTEMD_USER_DIR/lark-asr-poller.service" <<SERVICE
 [Unit]
-Description=lark-asr Feishu event hook
+Description=lark-asr Feishu minutes poller
 After=network-online.target
 Wants=network-online.target
 
@@ -34,7 +36,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=$ROOT
 Environment=PYTHONUNBUFFERED=1
-ExecStart=$ROOT/bin/lark-asr hook --config $CONFIG
+ExecStart=$ROOT/bin/lark-asr poll --config $CONFIG
 Restart=always
 RestartSec=5
 
@@ -45,7 +47,7 @@ SERVICE
 cat > "$SYSTEMD_USER_DIR/lark-asr-worker.service" <<SERVICE
 [Unit]
 Description=lark-asr meeting transcript worker
-After=network-online.target lark-asr-hook.service
+After=network-online.target lark-asr-poller.service
 Wants=network-online.target
 
 [Service]
@@ -61,7 +63,7 @@ WantedBy=default.target
 SERVICE
 
 systemctl --user daemon-reload
-systemctl --user enable --now lark-asr-hook.service lark-asr-worker.service
+systemctl --user enable --now lark-asr-poller.service lark-asr-worker.service
 
 echo "installed and started:"
-systemctl --user --no-pager --full status lark-asr-hook.service lark-asr-worker.service || true
+systemctl --user --no-pager --full status lark-asr-poller.service lark-asr-worker.service || true

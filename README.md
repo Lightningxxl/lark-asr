@@ -4,8 +4,8 @@ Feishu/Lark transcript-first meeting ingestion for FF1.
 
 The intended flow is:
 
-1. Listen to Feishu events with `lark-cli event +subscribe`.
-2. Backfill recent Feishu minutes with `lark-cli minutes +search --as user`, because event subscription is bot-only and can miss user-owned recordings.
+1. Poll recent Feishu minutes with `lark-cli minutes +search --as user` on a fixed interval.
+2. Optionally ingest NDJSON Feishu events with `lark-asr hook --stdin` for one-off integrations.
 3. Resolve `minute_token` from a minutes URL, meeting ID, calendar event ID, or minutes search result.
 4. Prefer Feishu's generated transcript.
 5. If Feishu has media but no usable transcript, run a local ASR command on FF1.
@@ -30,7 +30,7 @@ docker compose logs -f
 
 The Compose deployment uses:
 
-- `hook`: listens to Lark/Feishu bot events and periodically backfills recent user-visible minutes.
+- `poller`: periodically backfills recent user-visible minutes without consuming bot event delivery.
 - `worker`: resolves transcripts, runs local ASR fallback, and invokes Codex.
 - `config/config.toml`: runtime behavior.
 - `.env`: host path bindings for auth, knowledgebase, and models.
@@ -61,7 +61,7 @@ On FF1 the sample config assumes:
 
 If the knowledgebase repo is not present on FF1 yet, keep `[codex].enabled = false` until it is cloned there.
 
-If `lark-asr doctor` reports auth failure, rerun `lark-cli auth login` for the config dir before starting the hook. The service intentionally does not store app secrets or refresh tokens itself.
+If `lark-asr doctor` reports auth failure, rerun `lark-cli auth login` for the config dir before starting the poller. The service intentionally does not store app secrets or refresh tokens itself.
 
 Manual smoke test with an existing minutes URL:
 
@@ -73,10 +73,10 @@ Manual smoke test with an existing minutes URL:
 ./bin/lark-asr status --config config.toml
 ```
 
-Run the hook and worker:
+Run the poller and worker:
 
 ```bash
-./bin/lark-asr hook --config config.toml
+./bin/lark-asr poll --config config.toml
 ./bin/lark-asr worker --config config.toml
 ```
 
@@ -86,8 +86,8 @@ On FF1, the most direct deployment is a pair of user-level systemd services. Thi
 
 ```bash
 ./scripts/install_user_services.sh
-systemctl --user status lark-asr-hook lark-asr-worker
-journalctl --user -u lark-asr-hook -u lark-asr-worker -f
+systemctl --user status lark-asr-poller lark-asr-worker
+journalctl --user -u lark-asr-poller -u lark-asr-worker -f
 ```
 
 Useful overrides:
@@ -178,5 +178,6 @@ The prompt is intentionally short and tells Codex to read `AGENTS.md` and local 
 ```bash
 ./bin/lark-asr status --config config.toml
 ./bin/lark-asr logs minute:obcnlhmgj4929j262r5gy1q5 --config config.toml
+./bin/lark-asr poll --config config.toml --once
 ./bin/lark-asr worker --config config.toml --once
 ```

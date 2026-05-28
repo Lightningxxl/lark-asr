@@ -54,6 +54,11 @@ def build_parser() -> argparse.ArgumentParser:
     hook_parser.add_argument("--stdin", action="store_true", help="Read NDJSON events from stdin.")
     hook_parser.set_defaults(func=hook_command)
 
+    poll_parser = subparsers.add_parser("poll", help="Poll recent Feishu minutes and enqueue jobs.")
+    add_config(poll_parser)
+    poll_parser.add_argument("--once", action="store_true", help="Run one poll and exit.")
+    poll_parser.set_defaults(func=poll_command)
+
     worker_parser = subparsers.add_parser("worker", help="Process queued jobs.")
     add_config(worker_parser)
     worker_parser.add_argument("--once", action="store_true", help="Process currently due jobs once.")
@@ -131,6 +136,10 @@ def hook_command(args: argparse.Namespace) -> None:
             return
 
         client = LarkClient(loaded)
+        if not loaded.lark.event_enabled:
+            run_poll_loop(loaded, store, client)
+            return
+
         command = client.event_command()
         print("starting: " + " ".join(command), file=sys.stderr)
         process = subprocess.Popen(
@@ -162,6 +171,15 @@ def hook_command(args: argparse.Namespace) -> None:
                 for line in process.stdout.read().splitlines():
                     process_event_line(line, loaded, store)
                 raise SystemExit(process.returncode or 0)
+    finally:
+        store.close()
+
+
+def poll_command(args: argparse.Namespace) -> None:
+    loaded, store = open_store(args.config)
+    client = LarkClient(loaded)
+    try:
+        run_poll_loop(loaded, store, client, once=args.once)
     finally:
         store.close()
 
@@ -215,10 +233,22 @@ def doctor_command(args: argparse.Namespace) -> None:
 
     if not args.skip_lark:
         client = LarkClient(loaded)
-        command = client.event_command()
-        command.insert(3, "--dry-run")
-        result = client.run(command, cwd=loaded.paths.state_dir)
-        print(f"{'ok' if result.ok else 'fail'} lark.event.dry_run: exit={result.returncode}")
+        if loaded.lark.event_enabled:
+            command = client.event_command()
+            command.insert(3, "--dry-run")
+            result = client.run(command, cwd=loaded.paths.state_dir)
+            print(f"{'ok' if result.ok else 'fail'} lark.event.dry_run: exit={result.returncode}")
+        else:
+            end = datetime.now(timezone.utc)
+            start = end - timedelta(minutes=1)
+            result = client.search_minutes(
+                start=format_lark_datetime(start),
+                end=format_lark_datetime(end),
+                page_size=1,
+                query=loaded.lark.minutes_backfill_query,
+                cwd=loaded.paths.state_dir,
+            )
+            print(f"{'ok' if result.ok else 'fail'} lark.minutes.search: exit={result.returncode}")
         if result.stdout.strip():
             print(result.stdout.strip()[:1200])
         if result.stderr.strip():
@@ -240,6 +270,19 @@ def open_store(config_path: str | Path) -> tuple[Config, Store]:
     store = Store(loaded.db_path)
     store.init()
     return loaded, store
+
+
+def run_poll_loop(config: Config, store: Store, client: LarkClient, *, once: bool = False) -> None:
+    if not config.lark.minutes_backfill_enabled:
+        print("minutes backfill disabled; nothing to poll", file=sys.stderr)
+        return
+
+    while True:
+        run_minutes_backfill(config, store, client)
+        if once:
+            return
+        interval = max(30, config.lark.minutes_backfill_interval_seconds)
+        time.sleep(interval)
 
 
 def process_event_line(line: str, config: Config, store: Store) -> None:

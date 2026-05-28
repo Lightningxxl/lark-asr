@@ -21,9 +21,9 @@ The containers should own the application runtime. Host paths are only for:
 
 ## Layout
 
-- `compose.yaml`: Docker-first hook and worker services.
+- `compose.yaml`: Docker-first poller and worker services.
 - `Dockerfile`: lightweight app image with Python, `lark-cli`, and Codex CLI.
-- `docker/Dockerfile.asr`: GPU worker image with app runtime plus ASR dependencies. It defaults to the same Debian/Node base as the hook image and uses CUDA-enabled Python wheels to avoid pulling a large NVIDIA CUDA base image on FF1's slow Docker Hub path.
+- `docker/Dockerfile.asr`: GPU worker image with app runtime plus ASR dependencies. It defaults to the same Debian/Node base as the app image and uses CUDA-enabled Python wheels to avoid pulling a large NVIDIA CUDA base image on FF1's slow Docker Hub path.
 - `config/docker.example.toml`: container paths and commands.
 - `.env.example`: FF1 path bindings and image pins.
 - `scripts/bootstrap_docker_project.sh`: creates local config/data/work folders.
@@ -76,7 +76,7 @@ Reference: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/lat
    ```bash
    ./scripts/bootstrap_docker_project.sh
    ./scripts/docker_doctor.sh
-   docker compose build hook
+   docker compose build poller
    docker compose build worker
    ```
 

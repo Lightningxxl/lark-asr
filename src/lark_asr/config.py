@@ -16,6 +16,7 @@ class PathsConfig:
 class LarkConfig:
     cli: str = "lark-cli"
     profile: str = ""
+    event_enabled: bool = True
     event_as: str = "bot"
     api_as: str = "user"
     event_filter: str = r"im\.message|vc\.|calendar\."
@@ -103,6 +104,7 @@ def load_config(path: str | Path) -> Config:
     lark = LarkConfig(
         cli=str(lark_raw.get("cli", "lark-cli")),
         profile=str(lark_raw.get("profile", "")),
+        event_enabled=bool(lark_raw.get("event_enabled", True)),
         event_as=str(lark_raw.get("event_as", "bot")),
         api_as=str(lark_raw.get("api_as", "user")),
         event_filter=str(lark_raw.get("event_filter", r"im\.message|vc\.|calendar\.")),
