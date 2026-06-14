@@ -6,6 +6,9 @@ x-lark-asr-common: &lark-asr-common
     HOME: /home/app
     LARK_CLI_NO_PROXY: "1"
     PYTHONUNBUFFERED: "1"
+  dns:
+    - "${LARK_ASR_DNS_1:-192.168.2.249}"
+    - "${LARK_ASR_DNS_2:-192.168.2.1}"
   volumes:
     - ./config/config.toml:/config/config.toml:ro
     - ./data:/data
