@@ -10,7 +10,7 @@ from lark_asr.store import Store
 
 
 class PollCommandTest(unittest.TestCase):
-    def test_poll_once_uses_minutes_search_without_event_subscription(self):
+    def test_poll_once_combines_minutes_and_recorded_meeting_search(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             fake_cli = root / "fake-lark-cli"
@@ -35,6 +35,28 @@ class PollCommandTest(unittest.TestCase):
                                 ]
                             }
                         }))
+                        raise SystemExit(0)
+                    if args[:2] == ["vc", "+search"]:
+                        print(json.dumps({
+                            "data": {
+                                "items": [
+                                    {"id": "meeting_duplicate", "display_info": "智慧门店周会"},
+                                    {"id": "meeting_external", "display_info": "外部宠物行业会议"},
+                                    {"id": "meeting_without_recording", "display_info": "未录制会议"},
+                                ]
+                            }
+                        }))
+                        raise SystemExit(0)
+                    if args[:2] == ["vc", "+recording"]:
+                        meeting_id = args[args.index("--meeting-ids") + 1]
+                        tokens = {
+                            "meeting_duplicate": "obcnowni21y3jlyo87x5us62",
+                            "meeting_external": "obcnexternal1234567890",
+                        }
+                        recording = {"meeting_id": meeting_id}
+                        if meeting_id in tokens:
+                            recording["minute_token"] = tokens[meeting_id]
+                        print(json.dumps({"data": {"recordings": [recording]}}))
                         raise SystemExit(0)
                     raise SystemExit(2)
                     """
@@ -70,9 +92,15 @@ class PollCommandTest(unittest.TestCase):
                 jobs = store.list_jobs(limit=5)
             finally:
                 store.close()
-            self.assertEqual(len(jobs), 1)
-            self.assertEqual(jobs[0].id, "minute:obcnowni21y3jlyo87x5us62")
-            self.assertEqual(jobs[0].source, "minutes_search")
+            self.assertEqual(len(jobs), 2)
+            by_id = {job.id: job for job in jobs}
+            self.assertEqual(
+                by_id["minute:obcnowni21y3jlyo87x5us62"].source,
+                "minutes_search",
+            )
+            external = by_id["minute:obcnexternal1234567890"]
+            self.assertEqual(external.source, "vc_search")
+            self.assertEqual(external.meeting_id, "meeting_external")
 
 
 if __name__ == "__main__":

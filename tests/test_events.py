@@ -1,7 +1,12 @@
 import unittest
 
 from lark_asr.config import ProjectConfig
-from lark_asr.events import extract_minute_tokens, seeds_from_event, seeds_from_minutes_search
+from lark_asr.events import (
+    extract_minute_tokens,
+    seeds_from_event,
+    seeds_from_minutes_search,
+    seeds_from_vc_search,
+)
 
 
 class EventParsingTest(unittest.TestCase):
@@ -60,6 +65,28 @@ class EventParsingTest(unittest.TestCase):
         self.assertEqual(seeds[0].minute_token, "obcnowni21y3jlyo87x5us62")
         self.assertEqual(seeds[0].project_hint, "smart-store")
         self.assertEqual(seeds[0].event_type, "minutes.search")
+
+    def test_seed_from_vc_search_result(self):
+        data = {
+            "ok": True,
+            "data": {
+                "items": [
+                    {
+                        "id": "7652244038700354516",
+                        "display_info": "智慧门店的视频会议",
+                    }
+                ]
+            },
+        }
+        seeds = seeds_from_vc_search(
+            data,
+            [ProjectConfig(id="smart-store", path="projects/active/x", aliases=("智慧门店",))],
+        )
+        self.assertEqual(len(seeds), 1)
+        self.assertEqual(seeds[0].source, "vc_search")
+        self.assertEqual(seeds[0].meeting_id, "7652244038700354516")
+        self.assertEqual(seeds[0].project_hint, "smart-store")
+        self.assertEqual(seeds[0].event_type, "vc.search")
 
 
 if __name__ == "__main__":

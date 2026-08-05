@@ -12,12 +12,14 @@ import time
 
 from .config import Config, load_config
 from .events import (
+    JobSeed,
     extract_minute_tokens,
     seed_from_manual,
     seeds_from_event,
     seeds_from_minutes_search,
+    seeds_from_vc_search,
 )
-from .lark import LarkClient, json_from_stdout
+from .lark import LarkClient, extract_minute_token_from_result, json_from_stdout
 from .pipeline import Pipeline
 from .store import Store, render_jobs
 
@@ -54,7 +56,9 @@ def build_parser() -> argparse.ArgumentParser:
     hook_parser.add_argument("--stdin", action="store_true", help="Read NDJSON events from stdin.")
     hook_parser.set_defaults(func=hook_command)
 
-    poll_parser = subparsers.add_parser("poll", help="Poll recent Feishu minutes and enqueue jobs.")
+    poll_parser = subparsers.add_parser(
+        "poll", help="Poll recent Feishu minutes and recorded meetings and enqueue jobs."
+    )
     add_config(poll_parser)
     poll_parser.add_argument("--once", action="store_true", help="Run one poll and exit.")
     poll_parser.set_defaults(func=poll_command)
@@ -153,7 +157,7 @@ def hook_command(args: argparse.Namespace) -> None:
         next_backfill_at = 0.0
         while True:
             if loaded.lark.minutes_backfill_enabled and time.monotonic() >= next_backfill_at:
-                run_minutes_backfill(loaded, store, client)
+                run_backfill(loaded, store, client)
                 interval = max(30, loaded.lark.minutes_backfill_interval_seconds)
                 next_backfill_at = time.monotonic() + interval
 
@@ -233,26 +237,43 @@ def doctor_command(args: argparse.Namespace) -> None:
 
     if not args.skip_lark:
         client = LarkClient(loaded)
+        results = []
         if loaded.lark.event_enabled:
             command = client.event_command()
             command.insert(3, "--dry-run")
             result = client.run(command, cwd=loaded.paths.state_dir)
             print(f"{'ok' if result.ok else 'fail'} lark.event.dry_run: exit={result.returncode}")
+            results.append(result)
         else:
             end = datetime.now(timezone.utc)
             start = end - timedelta(minutes=1)
-            result = client.search_minutes(
+            minutes_result = client.search_minutes(
                 start=format_lark_datetime(start),
                 end=format_lark_datetime(end),
                 page_size=1,
                 query=loaded.lark.minutes_backfill_query,
                 cwd=loaded.paths.state_dir,
             )
-            print(f"{'ok' if result.ok else 'fail'} lark.minutes.search: exit={result.returncode}")
-        if result.stdout.strip():
-            print(result.stdout.strip()[:1200])
-        if result.stderr.strip():
-            print(result.stderr.strip()[-1200:], file=sys.stderr)
+            meetings_result = client.search_meetings(
+                start=format_lark_datetime(start),
+                end=format_lark_datetime(end),
+                page_size=1,
+                cwd=loaded.paths.state_dir,
+            )
+            print(
+                f"{'ok' if minutes_result.ok else 'fail'} "
+                f"lark.minutes.search: exit={minutes_result.returncode}"
+            )
+            print(
+                f"{'ok' if meetings_result.ok else 'fail'} "
+                f"lark.vc.search: exit={meetings_result.returncode}"
+            )
+            results.extend([minutes_result, meetings_result])
+        for result in results:
+            if result.stdout.strip():
+                print(result.stdout.strip()[:1200])
+            if result.stderr.strip():
+                print(result.stderr.strip()[-1200:], file=sys.stderr)
 
 
 def logs_command(args: argparse.Namespace) -> None:
@@ -274,11 +295,11 @@ def open_store(config_path: str | Path) -> tuple[Config, Store]:
 
 def run_poll_loop(config: Config, store: Store, client: LarkClient, *, once: bool = False) -> None:
     if not config.lark.minutes_backfill_enabled:
-        print("minutes backfill disabled; nothing to poll", file=sys.stderr)
+        print("backfill disabled; nothing to poll", file=sys.stderr)
         return
 
     while True:
-        run_minutes_backfill(config, store, client)
+        run_backfill(config, store, client)
         if once:
             return
         interval = max(30, config.lark.minutes_backfill_interval_seconds)
@@ -304,35 +325,79 @@ def process_event_line(line: str, config: Config, store: Store) -> None:
         print(f"queued {job.id}")
 
 
-def run_minutes_backfill(config: Config, store: Store, client: LarkClient) -> None:
+def run_backfill(config: Config, store: Store, client: LarkClient) -> None:
     end = datetime.now(timezone.utc)
     start = end - timedelta(minutes=max(1, config.lark.minutes_backfill_window_minutes))
-    result = client.search_minutes(
-        start=format_lark_datetime(start),
-        end=format_lark_datetime(end),
-        page_size=max(1, config.lark.minutes_backfill_page_size),
+    start_text = format_lark_datetime(start)
+    end_text = format_lark_datetime(end)
+    page_size = min(30, max(1, config.lark.minutes_backfill_page_size))
+
+    minutes_result = client.search_minutes(
+        start=start_text,
+        end=end_text,
+        page_size=page_size,
         query=config.lark.minutes_backfill_query,
         cwd=config.paths.state_dir,
     )
-    if not result.ok:
-        detail = (result.stderr or result.stdout).strip().replace("\n", " ")
-        print(f"minutes backfill failed: exit={result.returncode} {detail[:800]}", file=sys.stderr)
-        return
+    seeds: list[JobSeed] = []
+    if minutes_result.ok:
+        seeds.extend(seeds_from_minutes_search(json_from_stdout(minutes_result), config.projects))
+    else:
+        detail = (minutes_result.stderr or minutes_result.stdout).strip().replace("\n", " ")
+        print(
+            f"minutes backfill failed: exit={minutes_result.returncode} {detail[:800]}",
+            file=sys.stderr,
+        )
 
-    data = json_from_stdout(result)
-    seeds = seeds_from_minutes_search(data, config.projects)
+    vc_result = client.search_meetings(
+        start=start_text,
+        end=end_text,
+        page_size=page_size,
+        cwd=config.paths.state_dir,
+    )
+    vc_seen = 0
+    vc_with_recording = 0
+    if vc_result.ok:
+        vc_seeds = seeds_from_vc_search(json_from_stdout(vc_result), config.projects)
+        vc_seen = len(vc_seeds)
+        for seed in vc_seeds:
+            recording_result = client.recording(meeting_id=seed.meeting_id, cwd=config.paths.state_dir)
+            minute_token = extract_minute_token_from_result(recording_result)
+            if not minute_token:
+                continue
+            vc_with_recording += 1
+            seeds.append(
+                JobSeed(
+                    source=seed.source,
+                    minute_token=minute_token,
+                    meeting_id=seed.meeting_id,
+                    project_hint=seed.project_hint,
+                    event_type=seed.event_type,
+                    metadata=seed.metadata,
+                )
+            )
+    else:
+        detail = (vc_result.stderr or vc_result.stdout).strip().replace("\n", " ")
+        print(f"vc backfill failed: exit={vc_result.returncode} {detail[:800]}", file=sys.stderr)
+
     queued = 0
     existing = 0
+    seen_ids: set[str] = set()
     for seed in seeds:
+        if seed.stable_id in seen_ids:
+            continue
+        seen_ids.add(seed.stable_id)
         if store.get(seed.stable_id):
             existing += 1
             continue
         job = store.enqueue_seed(seed)
         queued += 1
         print(f"backfill queued {job.id}")
-    if seeds:
+    if seeds or vc_seen:
         print(
-            f"minutes backfill: seen={len(seeds)} queued={queued} existing={existing}",
+            "backfill: "
+            f"candidates={len(seen_ids)} vc_seen={vc_seen} vc_recordings={vc_with_recording} "
+            f"queued={queued} existing={existing}",
             file=sys.stderr,
         )
 
