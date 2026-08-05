@@ -99,7 +99,7 @@ def seeds_from_event(event: dict[str, Any], projects: Iterable[ProjectConfig] = 
 def seeds_from_minutes_search(data: Any, projects: Iterable[ProjectConfig] = ()) -> list[JobSeed]:
     seeds: list[JobSeed] = []
     seen_tokens: set[str] = set()
-    for item in iter_minutes_search_items(data):
+    for item in iter_search_items(data):
         token = minute_token_from_search_item(item)
         if not token or token in seen_tokens:
             continue
@@ -111,6 +111,27 @@ def seeds_from_minutes_search(data: Any, projects: Iterable[ProjectConfig] = ())
                 minute_token=token,
                 project_hint=infer_project_hint(" ".join(strings), projects),
                 event_type="minutes.search",
+                metadata=item,
+            )
+        )
+    return seeds
+
+
+def seeds_from_vc_search(data: Any, projects: Iterable[ProjectConfig] = ()) -> list[JobSeed]:
+    seeds: list[JobSeed] = []
+    seen_meeting_ids: set[str] = set()
+    for item in iter_search_items(data):
+        meeting_id = item.get("id")
+        if not isinstance(meeting_id, str) or not meeting_id or meeting_id in seen_meeting_ids:
+            continue
+        seen_meeting_ids.add(meeting_id)
+        strings = list(iter_strings(item))
+        seeds.append(
+            JobSeed(
+                source="vc_search",
+                meeting_id=meeting_id,
+                project_hint=infer_project_hint(" ".join(strings), projects),
+                event_type="vc.search",
                 metadata=item,
             )
         )
@@ -157,7 +178,7 @@ def extract_minute_tokens(text: str) -> set[str]:
     return tokens
 
 
-def iter_minutes_search_items(data: Any) -> Iterable[dict[str, Any]]:
+def iter_search_items(data: Any) -> Iterable[dict[str, Any]]:
     if isinstance(data, dict):
         payload = data.get("data")
         if isinstance(payload, dict):

@@ -119,6 +119,31 @@ class LarkClient:
             command.extend(["--query", query])
         return self.run(command, cwd=cwd)
 
+    def search_meetings(
+        self,
+        *,
+        start: str,
+        end: str,
+        page_size: int,
+        cwd: Path,
+    ) -> CommandResult:
+        command = [
+            self.config.lark.cli,
+            "vc",
+            "+search",
+            "--as",
+            self.config.lark.api_as,
+            "--start",
+            start,
+            "--end",
+            end,
+            "--page-size",
+            str(page_size),
+            "--format",
+            "json",
+        ]
+        return self.run(command, cwd=cwd)
+
     def run(self, command: list[str], *, cwd: Path) -> CommandResult:
         final_command = self._with_profile(command)
         completed = subprocess.run(
