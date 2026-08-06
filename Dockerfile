@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HOME=/home/app
 
-ARG LARK_CLI_VERSION=1.0.14
+ARG LARK_CLI_VERSION=1.0.84
 ARG CODEX_CLI_VERSION=0.125.0
 ARG DEBIAN_APT_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/debian
 ARG DEBIAN_SECURITY_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/debian-security
