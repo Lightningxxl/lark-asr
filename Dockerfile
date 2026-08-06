@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOME=/home/app
 
 ARG LARK_CLI_VERSION=1.0.84
-ARG CODEX_CLI_VERSION=0.125.0
+ARG CODEX_CLI_VERSION=0.146.1
 ARG DEBIAN_APT_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/debian
 ARG DEBIAN_SECURITY_MIRROR=http://mirrors.tuna.tsinghua.edu.cn/debian-security
 ARG NPM_REGISTRY=https://registry.npmjs.org
