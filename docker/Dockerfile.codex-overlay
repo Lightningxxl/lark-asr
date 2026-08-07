@@ -10,4 +10,10 @@ RUN npm config set registry "${NPM_REGISTRY}" \
     && npm install -g @openai/codex@${CODEX_CLI_VERSION} \
     && codex --version
 
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+COPY src ./src
+COPY scripts ./scripts
+
 USER 1000:1000
