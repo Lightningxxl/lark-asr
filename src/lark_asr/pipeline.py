@@ -135,6 +135,30 @@ class Pipeline:
             media = media_for_asr or (Path(job.media_path) if job.media_path else self.download_media(job, job_dir))
             if media and media.exists():
                 self.store.update(job.id, media_path=str(media))
+                duration_seconds = media_duration_seconds(media)
+                minimum_duration = self.config.pipeline.minimum_media_duration_seconds
+                if (
+                    duration_seconds is not None
+                    and minimum_duration > 0
+                    and duration_seconds < minimum_duration
+                ):
+                    self.store.update(
+                        job.id,
+                        status="completed_no_content",
+                        media_path=str(media),
+                        last_error="",
+                    )
+                    self.store.log(
+                        job.id,
+                        "info",
+                        "media is too short to contain a meeting; completed without ASR",
+                        {
+                            "path": str(media),
+                            "duration_seconds": duration_seconds,
+                            "minimum_duration_seconds": minimum_duration,
+                        },
+                    )
+                    return
                 transcript = self.run_asr(job, media, job_dir)
                 if transcript:
                     self.store.update(job.id, transcript_path=str(transcript))

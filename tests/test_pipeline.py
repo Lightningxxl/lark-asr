@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 import textwrap
 import unittest
+from unittest.mock import patch
 
 from lark_asr.config import AsrConfig, CodexConfig, Config, LarkConfig, PathsConfig, PipelineConfig
 from lark_asr.events import seed_from_manual
@@ -43,6 +44,70 @@ def init_knowledgebase_repo(root: Path) -> Path:
 
 
 class PipelineTest(unittest.TestCase):
+    def test_short_empty_recording_completes_without_asr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fake_cli = root / "fake-lark-cli"
+            fake_cli.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env python3
+                    import pathlib
+                    import sys
+
+                    args = sys.argv[1:]
+                    if args[:2] == ["vc", "+notes"]:
+                        output = pathlib.Path(args[args.index("--output-dir") + 1])
+                        output.mkdir(parents=True, exist_ok=True)
+                        (output / "transcript.txt").write_text("关键词:\\n", encoding="utf-8")
+                        print('{"ok": true}')
+                        raise SystemExit(0)
+                    if args[:2] == ["minutes", "+download"]:
+                        output = pathlib.Path(args[args.index("--output") + 1])
+                        output.parent.mkdir(parents=True, exist_ok=True)
+                        output.write_bytes(b"short audio")
+                        print('{"ok": true}')
+                        raise SystemExit(0)
+                    raise SystemExit(2)
+                    """
+                ),
+                encoding="utf-8",
+            )
+            os.chmod(fake_cli, 0o755)
+
+            asr_marker = root / "asr-ran"
+            config = Config(
+                paths=PathsConfig(
+                    state_dir=root / "data",
+                    work_dir=root / "work",
+                    knowledgebase_dir=root / "kb",
+                ),
+                lark=LarkConfig(cli=str(fake_cli)),
+                pipeline=PipelineConfig(
+                    minimum_transcript_chars=20,
+                    minimum_media_duration_seconds=5.0,
+                    resolve_retries=(),
+                ),
+                asr=AsrConfig(enabled=True, command=f"touch {asr_marker}"),
+            )
+            config.ensure_dirs()
+            store = Store(config.db_path)
+            try:
+                store.init()
+                job = store.enqueue_seed(seed_from_manual(minute_token="obcn_short"))
+                with patch("lark_asr.pipeline.media_duration_seconds", return_value=0.88):
+                    count = Pipeline(config, store).process_due_once()
+                self.assertEqual(count, 1)
+                updated = store.get(job.id)
+                self.assertIsNotNone(updated)
+                assert updated is not None
+                self.assertEqual(updated.status, "completed_no_content")
+                self.assertEqual(updated.last_error, "")
+                self.assertTrue(Path(updated.media_path).exists())
+                self.assertFalse(asr_marker.exists())
+            finally:
+                store.close()
+
     def test_feishu_transcript_path_completes_without_asr(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

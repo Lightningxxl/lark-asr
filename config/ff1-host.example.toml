@@ -34,6 +34,7 @@ transcript_first = true
 local_asr_fallback = true
 resolve_retries = ["1m", "5m", "15m", "30m"]
 minimum_transcript_chars = 80
+minimum_media_duration_seconds = 5.0
 auto_kb_write = false
 
 [asr]
