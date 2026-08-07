@@ -24,6 +24,7 @@ The containers should own the application runtime. Host paths are only for:
 - `compose.yaml`: Docker-first poller and worker services.
 - `Dockerfile`: lightweight app image with Python, `lark-cli`, and Codex CLI.
 - `docker/Dockerfile.asr`: GPU worker image with app runtime plus ASR dependencies. It defaults to the same Debian/Node base as the app image and uses CUDA-enabled Python wheels to avoid pulling a large NVIDIA CUDA base image on FF1's slow Docker Hub path.
+- `docker/Dockerfile.codex-overlay`: Codex-only maintenance image layered on an existing worker image. Use it for CLI/model upgrades so ASR and CUDA Python dependencies are not rebuilt.
 - `config/docker.example.toml`: container paths and commands.
 - `.env.example`: FF1 path bindings and image pins.
 - `scripts/bootstrap_docker_project.sh`: creates local config/data/work folders.
@@ -66,6 +67,30 @@ Reference: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/lat
 
 - External image/package downloads are slow or unreliable. Keep build mirrors configurable in `.env`; avoid NVIDIA CUDA base images unless the network path is fixed.
 - The Docker worker still needs one successful GPU smoke test after the image finishes building.
+
+## Codex-Only Upgrade
+
+When the ASR worker image is already healthy and only Codex needs an upgrade,
+build a thin overlay instead of rebuilding the CUDA and ASR dependencies:
+
+```bash
+docker build \
+  --file docker/Dockerfile.codex-overlay \
+  --build-arg ASR_RUNTIME_IMAGE=lark-asr/asr:local \
+  --build-arg CODEX_CLI_VERSION=0.146.1 \
+  --tag lark-asr/asr:codex-0.146.1 \
+  .
+```
+
+Set `LARK_ASR_ASR_IMAGE=lark-asr/asr:codex-0.146.1` in `.env`, then replace
+only the worker:
+
+```bash
+docker compose up -d --no-build worker
+docker compose exec -T worker codex --version
+```
+
+The original worker image remains available as the rollback image.
 
 ## Migration Sequence
 
