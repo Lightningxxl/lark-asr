@@ -41,6 +41,7 @@ class PipelineConfig:
     probe_media_duration_for_transcript_check: bool = True
     resolve_retries: tuple[str, ...] = ("1m", "5m", "15m", "30m")
     minimum_transcript_chars: int = 80
+    minimum_media_duration_seconds: float = 5.0
     auto_kb_write: bool = False
 
 
@@ -134,6 +135,9 @@ def load_config(path: str | Path) -> Config:
         ),
         resolve_retries=tuple(pipeline_raw.get("resolve_retries", ["1m", "5m", "15m", "30m"])),
         minimum_transcript_chars=int(pipeline_raw.get("minimum_transcript_chars", 80)),
+        minimum_media_duration_seconds=float(
+            pipeline_raw.get("minimum_media_duration_seconds", 5.0)
+        ),
         auto_kb_write=bool(pipeline_raw.get("auto_kb_write", False)),
     )
     asr_raw = raw.get("asr", {})
