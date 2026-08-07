@@ -1,0 +1,13 @@
+ARG ASR_RUNTIME_IMAGE=lark-asr/asr:local
+FROM ${ASR_RUNTIME_IMAGE}
+
+ARG CODEX_CLI_VERSION=0.146.1
+ARG NPM_REGISTRY=https://registry.npmjs.org
+
+USER root
+
+RUN npm config set registry "${NPM_REGISTRY}" \
+    && npm install -g @openai/codex@${CODEX_CLI_VERSION} \
+    && codex --version
+
+USER 1000:1000
