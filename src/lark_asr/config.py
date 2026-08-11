@@ -57,7 +57,7 @@ class CodexConfig:
     enabled: bool = False
     cmd: str = "codex"
     model: str = "gpt-5.6-sol"
-    reasoning_effort: str = "high"
+    reasoning_effort: str = "medium"
     extra_args: str = ""
     prompt_template: str = ""
 
@@ -151,7 +151,7 @@ def load_config(path: str | Path) -> Config:
         enabled=bool(codex_raw.get("enabled", False)),
         cmd=str(codex_raw.get("cmd", "codex")),
         model=str(codex_raw.get("model", "gpt-5.6-sol")),
-        reasoning_effort=str(codex_raw.get("reasoning_effort", "high")),
+        reasoning_effort=str(codex_raw.get("reasoning_effort", "medium")),
         extra_args=str(codex_raw.get("extra_args", "")),
         prompt_template=str(codex_raw.get("prompt_template", "")),
     )
