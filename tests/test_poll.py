@@ -78,7 +78,7 @@ class PollCommandTest(unittest.TestCase):
                     cli = "{fake_cli}"
                     event_enabled = false
                     minutes_backfill_enabled = true
-                    minutes_backfill_interval_seconds = 3600
+                    minutes_backfill_interval_seconds = 900
                     """
                 ),
                 encoding="utf-8",
