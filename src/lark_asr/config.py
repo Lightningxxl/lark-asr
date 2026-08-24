@@ -22,7 +22,7 @@ class LarkConfig:
     event_filter: str = r"im\.message|vc\.|calendar\."
     event_types: str = ""
     minutes_backfill_enabled: bool = True
-    minutes_backfill_interval_seconds: int = 300
+    minutes_backfill_interval_seconds: int = 3600
     minutes_backfill_window_minutes: int = 720
     minutes_backfill_page_size: int = 20
     minutes_backfill_query: str = ""
@@ -112,7 +112,7 @@ def load_config(path: str | Path) -> Config:
         event_types=str(lark_raw.get("event_types", "")),
         minutes_backfill_enabled=bool(lark_raw.get("minutes_backfill_enabled", True)),
         minutes_backfill_interval_seconds=int(
-            lark_raw.get("minutes_backfill_interval_seconds", 300)
+            lark_raw.get("minutes_backfill_interval_seconds", 3600)
         ),
         minutes_backfill_window_minutes=int(lark_raw.get("minutes_backfill_window_minutes", 720)),
         minutes_backfill_page_size=int(lark_raw.get("minutes_backfill_page_size", 20)),
