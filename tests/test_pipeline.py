@@ -458,13 +458,16 @@ class PipelineTest(unittest.TestCase):
                     """\
                     #!/usr/bin/env bash
                     set -euo pipefail
+                    input=""
                     out_dir=""
                     while [ "$#" -gt 0 ]; do
                       case "$1" in
+                        --input) input="$2"; shift 2 ;;
                         --output-dir) out_dir="$2"; shift 2 ;;
                         *) shift ;;
                       esac
                     done
+                    test -f "$input"
                     mkdir -p "$out_dir"
                     printf '强制本地 ASR 转写，跳过飞书文本结果，直接使用本地音频。\\n' > "$out_dir/transcript.md"
                     """
@@ -488,10 +491,15 @@ class PipelineTest(unittest.TestCase):
                 ),
             )
             config.ensure_dirs()
+            media_path = root / "media with spaces" / "recording intro.m4a"
+            media_path.parent.mkdir(parents=True)
+            media_path.write_bytes(b"fake audio")
             store = Store(config.db_path)
             try:
                 store.init()
-                job = store.enqueue_seed(seed_from_manual(minute_token="obcn_force"))
+                job = store.enqueue_seed(
+                    seed_from_manual(minute_token="obcn_force", media_path=str(media_path))
+                )
                 count = Pipeline(config, store).process_due_once()
                 self.assertEqual(count, 1)
                 updated = store.get(job.id)
