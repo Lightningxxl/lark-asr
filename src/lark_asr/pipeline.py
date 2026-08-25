@@ -261,6 +261,7 @@ class Pipeline:
             media_path=media_path,
             transcript_path="",
             config=self.config,
+            shell_quote=True,
         )
         asr_dir = job_dir / "asr"
         asr_dir.mkdir(parents=True, exist_ok=True)
@@ -712,6 +713,7 @@ def format_template(
     media_path: Path,
     transcript_path: Path | str,
     config: Config,
+    shell_quote: bool = False,
 ) -> str:
     values = {
         "job_id": job.id,
@@ -725,6 +727,8 @@ def format_template(
         "knowledgebase_dir": str(config.paths.knowledgebase_dir),
         "now": now_iso(),
     }
+    if shell_quote:
+        values = {key: shlex.quote(value) for key, value in values.items()}
     return template.format_map(DefaultDict(values))
 
 
