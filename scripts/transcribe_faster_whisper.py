@@ -8,7 +8,6 @@ from pathlib import Path
 CONFIRMED_HOTWORDS_HEADING = "## 已确认热词"
 MAX_HOTWORDS = 100
 MAX_HOTWORDS_CHARS = 1_200
-MAX_INITIAL_PROMPT_CHARS = 400
 
 
 def load_confirmed_hotwords(path: Path) -> list[str]:
@@ -50,19 +49,6 @@ def load_confirmed_hotwords(path: Path) -> list[str]:
             f"confirmed hotwords exceed character limit {MAX_HOTWORDS_CHARS}"
         )
     return hotwords
-
-
-def build_initial_prompt(hotwords: list[str]) -> str | None:
-    if not hotwords:
-        return None
-    prefix = "本次会议可能包含以下专名和技术术语："
-    selected: list[str] = []
-    for hotword in hotwords:
-        candidate = prefix + "、".join([*selected, hotword]) + "。"
-        if len(candidate) > MAX_INITIAL_PROMPT_CHARS:
-            break
-        selected.append(hotword)
-    return prefix + "、".join(selected) + "。" if selected else None
 
 
 def stamp(seconds: float, sep: str = ".") -> str:
@@ -133,7 +119,6 @@ def main() -> None:
     )
     hotwords = load_confirmed_hotwords(hotwords_path) if hotwords_path else []
     hotwords_text = ", ".join(hotwords) or None
-    initial_prompt = build_initial_prompt(hotwords)
 
     started = time.time()
     from faster_whisper import WhisperModel
@@ -153,7 +138,6 @@ def main() -> None:
         word_timestamps=True,
         condition_on_previous_text=False,
         hotwords=hotwords_text,
-        initial_prompt=initial_prompt,
     )
 
     segments = []
