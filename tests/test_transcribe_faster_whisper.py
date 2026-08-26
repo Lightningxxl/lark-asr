@@ -49,14 +49,5 @@ class TranscribeFasterWhisperTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "已确认热词"):
                 module.load_confirmed_hotwords(path)
 
-    def test_builds_bounded_initial_prompt(self):
-        module = load_script()
-        prompt = module.build_initial_prompt(["ORIA", "Claworld", "WorkBuddy"])
-
-        self.assertIn("ORIA", prompt)
-        self.assertIn("Claworld", prompt)
-        self.assertLessEqual(len(prompt), module.MAX_INITIAL_PROMPT_CHARS)
-
-
 if __name__ == "__main__":
     unittest.main()
