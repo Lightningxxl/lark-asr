@@ -2,12 +2,13 @@
 set -uo pipefail
 
 usage() {
-  echo "usage: asr_fallback.sh --input AUDIO --output-dir DIR [--minute-token TOKEN]" >&2
+  echo "usage: asr_fallback.sh --input AUDIO --output-dir DIR [--minute-token TOKEN] [--hotwords-file FILE]" >&2
 }
 
 INPUT=""
 OUT_DIR=""
 MINUTE_TOKEN=""
+HOTWORDS_FILE="${LARK_ASR_HOTWORDS_FILE:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -21,6 +22,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --minute-token)
       MINUTE_TOKEN="${2:-}"
+      shift 2
+      ;;
+    --hotwords-file)
+      HOTWORDS_FILE="${2:-}"
       shift 2
       ;;
     -h|--help)
@@ -93,6 +98,9 @@ if [[ "$USE_WHISPER" == "1" || "$USE_WHISPER" == "true" ]]; then
   )
   if [[ -n "$WHISPER_MODEL_DIR" ]]; then
     whisper_args+=(--model-dir "$WHISPER_MODEL_DIR")
+  fi
+  if [[ -n "$HOTWORDS_FILE" ]]; then
+    whisper_args+=(--hotwords-file "$HOTWORDS_FILE")
   fi
   if "$PYTHON" "${whisper_args[@]}"; then
     whisper_ok=1
