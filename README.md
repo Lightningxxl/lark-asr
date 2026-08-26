@@ -156,18 +156,20 @@ Useful environment knobs for the ASR command:
 - `LARK_ASR_WHISPER_MODEL`
 - `LARK_ASR_WHISPER_MODEL_DIR`
 - `LARK_ASR_USE_WHISPER`
-- `LARK_ASR_HOTWORDS_FILE`
+- `LARK_ASR_TERMINOLOGY_FILE`
 - `LARK_ASR_RESTORE_PUNCTUATION`
 - `LARK_ASR_DEVICE`
 - `LARK_ASR_FUNASR_MODEL`
 - `LARK_ASR_FUNASR_DEVICE`
 
-Whisper can read confirmed terminology from a knowledgebase Markdown file. Pass
-`--hotwords-file {knowledgebase_dir}/company/ASR热词库.md` to
-`asr_fallback.sh`, or set `LARK_ASR_HOTWORDS_FILE`. The file must contain an
-`## 已确认热词` Markdown table whose first column is `标准写法`. Candidate terms
-and known misrecognitions remain available to the Codex archive step but are not
-sent to Whisper.
+The ASR pipeline can normalize confirmed terminology from a knowledgebase
+Markdown file. Pass
+`--terminology-file {knowledgebase_dir}/company/ASR热词库.md` to
+`asr_fallback.sh`, or set `LARK_ASR_TERMINOLOGY_FILE`. The file must contain an
+`## 已确认热词` Markdown table with `标准写法` and `常见误识别` columns. Whisper
+keeps its baseline decoding behavior, then confirmed aliases are replaced with
+their standard spellings before speaker labeling and punctuation restoration.
+Candidate terms remain available only to the Codex archive step.
 
 The current FF1 host has an existing ASR environment at `/home/xavierx/codex-transcript-20260512/.venv/bin/python` and a local faster-whisper CT2 model at `/home/xavierx/codex-transcript-20260512/models/AI-ModelScope/whisper-large-v3-ct2-float16`. Docker should reuse the model files via `MODELS_DIR`, not mount the old virtualenv.
 
