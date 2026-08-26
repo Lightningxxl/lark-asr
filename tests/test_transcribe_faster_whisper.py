@@ -15,7 +15,7 @@ def load_script():
 
 
 class TranscribeFasterWhisperTest(unittest.TestCase):
-    def test_loads_only_confirmed_hotwords_and_deduplicates(self):
+    def test_loads_only_confirmed_terminology_and_deduplicates(self):
         module = load_script()
         content = """# ASR热词库
 
@@ -36,10 +36,16 @@ class TranscribeFasterWhisperTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "hotwords.md"
             path.write_text(content, encoding="utf-8")
-            hotwords = module.load_confirmed_hotwords(path)
+            terms = module.load_confirmed_terminology(path)
 
-        self.assertEqual(hotwords, ["Alpha", "ExamplePlatform"])
-        self.assertNotIn("ExampleTool", hotwords)
+        self.assertEqual(
+            terms,
+            [
+                {"standard": "Alpha", "aliases": ["Alias"]},
+                {"standard": "ExamplePlatform", "aliases": ["example.org"]},
+            ],
+        )
+        self.assertNotIn("ExampleTool", [term["standard"] for term in terms])
 
     def test_requires_confirmed_hotwords_section(self):
         module = load_script()
@@ -47,7 +53,42 @@ class TranscribeFasterWhisperTest(unittest.TestCase):
             path = Path(temp_dir) / "hotwords.md"
             path.write_text("# ASR热词库\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "已确认热词"):
-                module.load_confirmed_hotwords(path)
+                module.load_confirmed_terminology(path)
+
+    def test_normalizes_confirmed_aliases_without_partial_word_matches(self):
+        module = load_script()
+        terms = [
+            {"standard": "Alpha", "aliases": ["Alias", "示例别名"]},
+            {"standard": "Claude Code", "aliases": ["Cloud Code"]},
+        ]
+
+        text, corrections = module.normalize_terminology(
+            "Alias 和示例别名使用 cloud code，但 cloud codes 是另一段文本。", terms
+        )
+
+        self.assertEqual(
+            text,
+            "Alpha 和Alpha使用 Claude Code，但 cloud codes 是另一段文本。",
+        )
+        self.assertEqual(corrections, {"Alpha": 2, "Claude Code": 1})
+
+    def test_rejects_aliases_that_map_to_multiple_terms(self):
+        module = load_script()
+        content = """# ASR热词库
+
+## 已确认热词
+
+| 标准写法 | 常见误识别 | 适用范围 | 依据 |
+|---|---|---|---|
+| ExamplePlatform | example.org | 全局 | 产品名 |
+| example-platform.example | example.org | 全局 | 域名 |
+"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "hotwords.md"
+            path.write_text(content, encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "maps to both"):
+                module.load_confirmed_terminology(path)
 
 if __name__ == "__main__":
     unittest.main()
