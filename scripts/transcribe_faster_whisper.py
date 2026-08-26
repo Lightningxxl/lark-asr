@@ -4,7 +4,65 @@ import json
 import time
 from pathlib import Path
 
-from faster_whisper import WhisperModel
+
+CONFIRMED_HOTWORDS_HEADING = "## 已确认热词"
+MAX_HOTWORDS = 100
+MAX_HOTWORDS_CHARS = 1_200
+MAX_INITIAL_PROMPT_CHARS = 400
+
+
+def load_confirmed_hotwords(path: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    in_confirmed_section = False
+    found_confirmed_section = False
+    hotwords: list[str] = []
+    seen: set[str] = set()
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("## "):
+            in_confirmed_section = line == CONFIRMED_HOTWORDS_HEADING
+            found_confirmed_section = found_confirmed_section or in_confirmed_section
+            continue
+        if not in_confirmed_section or not line.startswith("|"):
+            continue
+
+        cells = [cell.strip().strip("`") for cell in line.strip("|").split("|")]
+        if not cells:
+            continue
+        value = cells[0]
+        if value == "标准写法" or not value or set(value) <= {"-", ":"}:
+            continue
+
+        key = value.casefold()
+        if key not in seen:
+            hotwords.append(value)
+            seen.add(key)
+
+    if not found_confirmed_section:
+        raise ValueError(f"missing {CONFIRMED_HOTWORDS_HEADING!r} in {path}")
+    if not hotwords:
+        raise ValueError(f"no confirmed hotwords found in {path}")
+    if len(hotwords) > MAX_HOTWORDS:
+        raise ValueError(f"confirmed hotwords exceed limit {MAX_HOTWORDS}: {len(hotwords)}")
+    if len(", ".join(hotwords)) > MAX_HOTWORDS_CHARS:
+        raise ValueError(
+            f"confirmed hotwords exceed character limit {MAX_HOTWORDS_CHARS}"
+        )
+    return hotwords
+
+
+def build_initial_prompt(hotwords: list[str]) -> str | None:
+    if not hotwords:
+        return None
+    prefix = "本次会议可能包含以下专名和技术术语："
+    selected: list[str] = []
+    for hotword in hotwords:
+        candidate = prefix + "、".join([*selected, hotword]) + "。"
+        if len(candidate) > MAX_INITIAL_PROMPT_CHARS:
+            break
+        selected.append(hotword)
+    return prefix + "、".join(selected) + "。" if selected else None
 
 
 def stamp(seconds: float, sep: str = ".") -> str:
@@ -63,14 +121,23 @@ def main() -> None:
     parser.add_argument("--compute-type", default="float16")
     parser.add_argument("--language", default=None)
     parser.add_argument("--beam-size", type=int, default=5)
+    parser.add_argument("--hotwords-file", default=None)
     args = parser.parse_args()
 
     audio = Path(args.audio).expanduser().resolve()
     out_dir = Path(args.out_dir).expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     stem = audio.stem
+    hotwords_path = (
+        Path(args.hotwords_file).expanduser().resolve() if args.hotwords_file else None
+    )
+    hotwords = load_confirmed_hotwords(hotwords_path) if hotwords_path else []
+    hotwords_text = ", ".join(hotwords) or None
+    initial_prompt = build_initial_prompt(hotwords)
 
     started = time.time()
+    from faster_whisper import WhisperModel
+
     model = WhisperModel(
         args.model,
         device=args.device,
@@ -85,6 +152,8 @@ def main() -> None:
         vad_parameters={"min_silence_duration_ms": 500},
         word_timestamps=True,
         condition_on_previous_text=False,
+        hotwords=hotwords_text,
+        initial_prompt=initial_prompt,
     )
 
     segments = []
@@ -122,6 +191,9 @@ def main() -> None:
         "language_probability": getattr(info, "language_probability", None),
         "duration": getattr(info, "duration", None),
         "duration_after_vad": getattr(info, "duration_after_vad", None),
+        "hotwords_source": str(hotwords_path) if hotwords_path else None,
+        "hotwords_count": len(hotwords),
+        "hotwords": hotwords,
         "elapsed_seconds": round(time.time() - started, 3),
     }
     payload = {"metadata": metadata, "segments": segments}

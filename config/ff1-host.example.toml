@@ -49,7 +49,8 @@ env \
   /home/xavierx/projects/lark-asr/scripts/asr_fallback.sh \
   --input {media_path} \
   --output-dir {job_dir}/local_asr \
-  --minute-token {minute_token}
+  --minute-token {minute_token} \
+  --hotwords-file {knowledgebase_dir}/company/ASR热词库.md
 """
 output_glob = "local_asr/**/*.md"
 
