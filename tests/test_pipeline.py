@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -245,6 +246,17 @@ class PipelineTest(unittest.TestCase):
                 self.assertIn(
                     "docs(asr): import meeting transcript",
                     git(["log", "--oneline", "origin/main", "-1"], knowledgebase_dir).stdout,
+                )
+                git_commands = [
+                    json.loads(path.read_text(encoding="utf-8"))
+                    for path in (
+                        root / "work" / "minute_obcn_test" / "codex" / "git"
+                    ).glob("*.command.json")
+                ]
+                self.assertIn(["git", "fetch", "origin"], git_commands)
+                self.assertIn(["git", "rebase", "origin/main"], git_commands)
+                self.assertFalse(
+                    any(command[:3] == ["git", "pull", "--rebase"] for command in git_commands)
                 )
             finally:
                 store.close()
