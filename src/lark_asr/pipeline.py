@@ -406,7 +406,7 @@ class Pipeline:
             job,
             codex_dir,
             "rebase-before-codex",
-            ["pull", "--rebase", "origin", branch],
+            ["rebase", f"origin/{branch}"],
         ):
             return False
         self.store.log(job.id, "info", "knowledgebase git synced before Codex", {"branch": branch})
