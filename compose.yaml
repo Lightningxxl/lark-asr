@@ -51,6 +51,10 @@ services:
       HOME: /home/app
       LARK_CLI_NO_PROXY: "1"
       PYTHONUNBUFFERED: "1"
+      HTTP_PROXY: "${LARK_ASR_HTTP_PROXY:-}"
+      HTTPS_PROXY: "${LARK_ASR_HTTPS_PROXY:-}"
+      ALL_PROXY: "${LARK_ASR_ALL_PROXY:-}"
+      NO_PROXY: "${LARK_ASR_NO_PROXY:-localhost,127.0.0.1}"
       GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=accept-new"
       HF_HOME: /models/.cache/huggingface
       MODELSCOPE_CACHE: /models/.cache/modelscope
