@@ -29,6 +29,9 @@ The containers should own the application runtime. Host paths are only for:
 - `.env.example`: FF1 path bindings and image pins.
 - `scripts/bootstrap_docker_project.sh`: creates local config/data/work folders.
 - `scripts/docker_doctor.sh`: checks Docker, GPU runtime, path bindings, and compose config.
+- `scripts/gpu_watchdog.sh`: recreates the worker when the host GPU is healthy but the
+  container GPU runtime is stale.
+- `scripts/install_gpu_watchdog.sh`: installs the per-minute user-level systemd timer.
 
 ## FF1 Prerequisites
 
@@ -115,3 +118,16 @@ The original worker image remains available as the rollback image.
    ```
 
 7. Keep the host-run config as rollback until at least one transcript-first and one local-ASR fallback job succeed.
+
+## GPU Runtime Recovery
+
+Install the host-side watchdog after the Docker worker passes its GPU smoke test:
+
+```bash
+./scripts/install_gpu_watchdog.sh
+```
+
+The timer checks the worker every minute. When the host can run `nvidia-smi` and
+the worker cannot, it recreates only the worker container and verifies GPU access.
+The pipeline schedules CUDA/NVML availability failures for another ASR attempt in
+five minutes, allowing the watchdog recovery to complete first.

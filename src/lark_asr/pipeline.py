@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
+import time
 from typing import Any
 
 from .config import Config
@@ -23,6 +24,23 @@ from .timeutil import after_duration, now_iso
 
 TEXT_EXTENSIONS = {".md", ".txt", ".srt", ".vtt"}
 MEDIA_EXTENSIONS = {".m4a", ".mp3", ".wav", ".aac", ".flac", ".mp4", ".mov", ".mkv"}
+GIT_NETWORK_RETRY_DELAYS = (2, 5, 10, 20)
+GIT_NETWORK_ERROR_MARKERS = (
+    "connection closed",
+    "connection refused",
+    "connection reset",
+    "could not resolve host",
+    "kex_exchange_identification",
+    "remote end hung up unexpectedly",
+    "ssl_error_syscall",
+    "timed out",
+)
+ASR_GPU_RETRY_DELAY = "5m"
+ASR_GPU_ERROR_MARKERS = (
+    "cuda failed with error no cuda-capable device is detected",
+    "failed to initialize nvml",
+    "no cuda gpus are available",
+)
 
 
 @dataclass(frozen=True)
@@ -278,6 +296,24 @@ class Pipeline:
         (asr_dir / "stdout.log").write_text(completed.stdout, encoding="utf-8")
         (asr_dir / "stderr.log").write_text(completed.stderr, encoding="utf-8")
         if completed.returncode != 0:
+            if is_transient_asr_gpu_error(completed):
+                self.store.update(
+                    job.id,
+                    status="needs_asr",
+                    not_before=after_duration(ASR_GPU_RETRY_DELAY),
+                    last_error="ASR GPU runtime unavailable; retry scheduled",
+                )
+                self.store.log(
+                    job.id,
+                    "warning",
+                    "ASR GPU runtime unavailable; retry scheduled",
+                    {
+                        "delay": ASR_GPU_RETRY_DELAY,
+                        "returncode": completed.returncode,
+                        "stderr": completed.stderr[-1000:],
+                    },
+                )
+                return None
             self.store.update(
                 job.id,
                 status="failed",
@@ -503,6 +539,20 @@ class Pipeline:
         result = self.run_git(codex_dir, label, args)
         if result.returncode == 0:
             return True
+        if args and args[0] in {"fetch", "push"} and is_transient_git_network_error(result):
+            for attempt, delay in enumerate(GIT_NETWORK_RETRY_DELAYS, start=2):
+                self.store.log(
+                    job.id,
+                    "warning",
+                    "retrying transient git network failure",
+                    {"label": label, "attempt": attempt, "delay_seconds": delay},
+                )
+                time.sleep(delay)
+                result = self.run_git(codex_dir, f"{label}-retry-{attempt}", args)
+                if result.returncode == 0:
+                    return True
+                if not is_transient_git_network_error(result):
+                    break
         self.fail_git_step(job, f"git {label} failed", result)
         return False
 
@@ -546,6 +596,16 @@ class Pipeline:
             encoding="utf-8",
         )
         return completed
+
+
+def is_transient_git_network_error(result: subprocess.CompletedProcess[str]) -> bool:
+    detail = f"{result.stdout}\n{result.stderr}".lower()
+    return any(marker in detail for marker in GIT_NETWORK_ERROR_MARKERS)
+
+
+def is_transient_asr_gpu_error(result: subprocess.CompletedProcess[str]) -> bool:
+    detail = f"{result.stdout}\n{result.stderr}".lower()
+    return any(marker in detail for marker in ASR_GPU_ERROR_MARKERS)
 
 
 def find_best_text_file(base: Path, minimum_chars: int, pattern: str = "**/*") -> Path | None:

@@ -45,6 +45,92 @@ def init_knowledgebase_repo(root: Path) -> Path:
 
 
 class PipelineTest(unittest.TestCase):
+    def test_gpu_runtime_failure_schedules_asr_retry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            media_path = root / "meeting.opus"
+            media_path.write_bytes(b"fake audio")
+            config = Config(
+                paths=PathsConfig(
+                    state_dir=root / "data",
+                    work_dir=root / "work",
+                    knowledgebase_dir=root / "kb",
+                ),
+                pipeline=PipelineConfig(minimum_media_duration_seconds=0),
+                asr=AsrConfig(
+                    enabled=True,
+                    command="printf 'No CUDA GPUs are available\\n' >&2; exit 1",
+                ),
+            )
+            config.ensure_dirs()
+            store = Store(config.db_path)
+            try:
+                store.init()
+                job = store.enqueue_seed(seed_from_manual(media_path=str(media_path)))
+                self.assertEqual(Pipeline(config, store).process_due_once(), 1)
+                updated = store.get(job.id)
+                self.assertIsNotNone(updated)
+                assert updated is not None
+                self.assertEqual(updated.status, "needs_asr")
+                self.assertEqual(
+                    updated.last_error,
+                    "ASR GPU runtime unavailable; retry scheduled",
+                )
+                self.assertGreater(updated.not_before, updated.updated_at)
+            finally:
+                store.close()
+
+    def test_git_fetch_retries_transient_network_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = Config(
+                paths=PathsConfig(
+                    state_dir=root / "data",
+                    work_dir=root / "work",
+                    knowledgebase_dir=root / "kb",
+                )
+            )
+            config.ensure_dirs()
+            store = Store(config.db_path)
+            try:
+                store.init()
+                job = store.enqueue_seed(seed_from_manual(minute_token="obcn_git_retry"))
+                pipeline = Pipeline(config, store)
+                failed = subprocess.CompletedProcess(
+                    ["git", "fetch", "origin"],
+                    128,
+                    "",
+                    "Connection reset by peer",
+                )
+                succeeded = subprocess.CompletedProcess(
+                    ["git", "fetch", "origin"],
+                    0,
+                    "",
+                    "",
+                )
+                with (
+                    patch.object(pipeline, "run_git", side_effect=[failed, failed, succeeded]) as run,
+                    patch("lark_asr.pipeline.time.sleep") as sleep,
+                ):
+                    self.assertTrue(
+                        pipeline.run_git_or_fail(
+                            job,
+                            root / "codex",
+                            "fetch-before-codex",
+                            ["fetch", "origin"],
+                        )
+                    )
+                self.assertEqual(run.call_count, 3)
+                self.assertEqual([call.args[1] for call in run.call_args_list], [
+                    "fetch-before-codex",
+                    "fetch-before-codex-retry-2",
+                    "fetch-before-codex-retry-3",
+                ])
+                self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 5])
+                self.assertEqual(store.get(job.id).status, "queued")
+            finally:
+                store.close()
+
     def test_short_empty_recording_completes_without_asr(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
