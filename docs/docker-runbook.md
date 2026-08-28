@@ -32,6 +32,8 @@ The containers should own the application runtime. Host paths are only for:
 - `scripts/gpu_watchdog.sh`: recreates the worker when the host GPU is healthy but the
   container GPU runtime is stale.
 - `scripts/install_gpu_watchdog.sh`: installs the per-minute user-level systemd timer.
+- Optional `LARK_ASR_HTTP_PROXY`, `LARK_ASR_HTTPS_PROXY`, and
+  `LARK_ASR_ALL_PROXY` values pass an egress proxy only to the worker runtime.
 
 ## FF1 Prerequisites
 
