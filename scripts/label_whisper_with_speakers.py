@@ -51,16 +51,25 @@ def best_speaker(start_ms: int, end_ms: int, speaker_segments: list[dict], max_n
     return "UNKNOWN"
 
 
-def merge_segments(segments: list[dict], max_gap_ms: int) -> list[dict]:
+def merge_segments(
+    segments: list[dict],
+    max_gap_ms: int,
+    max_segment_ms: int,
+    max_segment_chars: int,
+) -> list[dict]:
     merged: list[dict] = []
     for seg in segments:
+        previous = merged[-1] if merged else None
+        combined_text = norm_text(f"{previous['text']} {seg['text']}") if previous else ""
         if (
-            merged
-            and merged[-1]["speaker"] == seg["speaker"]
-            and seg["start_ms"] - merged[-1]["end_ms"] <= max_gap_ms
+            previous
+            and previous["speaker"] == seg["speaker"]
+            and seg["start_ms"] - previous["end_ms"] <= max_gap_ms
+            and seg["end_ms"] - previous["start_ms"] <= max_segment_ms
+            and len(combined_text) <= max_segment_chars
         ):
-            merged[-1]["end_ms"] = max(merged[-1]["end_ms"], seg["end_ms"])
-            merged[-1]["text"] = norm_text(f"{merged[-1]['text']} {seg['text']}")
+            previous["end_ms"] = max(previous["end_ms"], seg["end_ms"])
+            previous["text"] = combined_text
         else:
             merged.append(dict(seg))
 
@@ -69,7 +78,14 @@ def merge_segments(segments: list[dict], max_gap_ms: int) -> list[dict]:
     return merged
 
 
-def label_segments(whisper: dict, diarization: dict, max_gap_ms: int, max_nearest_ms: int) -> list[dict]:
+def label_segments(
+    whisper: dict,
+    diarization: dict,
+    max_gap_ms: int,
+    max_nearest_ms: int,
+    max_segment_ms: int,
+    max_segment_chars: int,
+) -> list[dict]:
     speaker_segments = sorted(diarization.get("segments", []), key=lambda item: item["start_ms"])
     labeled: list[dict] = []
 
@@ -88,7 +104,7 @@ def label_segments(whisper: dict, diarization: dict, max_gap_ms: int, max_neares
                 "text": text,
             }
         )
-    return merge_segments(labeled, max_gap_ms)
+    return merge_segments(labeled, max_gap_ms, max_segment_ms, max_segment_chars)
 
 
 def write_txt(path: Path, segments: list[dict]) -> None:
@@ -123,6 +139,8 @@ def main() -> None:
     parser.add_argument("--out-prefix", required=True)
     parser.add_argument("--max-gap-ms", type=int, default=1200)
     parser.add_argument("--max-nearest-ms", type=int, default=2500)
+    parser.add_argument("--max-segment-ms", type=int, default=30_000)
+    parser.add_argument("--max-segment-chars", type=int, default=180)
     args = parser.parse_args()
 
     whisper_path = Path(args.whisper_json)
@@ -132,7 +150,14 @@ def main() -> None:
 
     whisper = json.loads(whisper_path.read_text(encoding="utf-8"))
     diarization = json.loads(speaker_path.read_text(encoding="utf-8"))
-    segments = label_segments(whisper, diarization, args.max_gap_ms, args.max_nearest_ms)
+    segments = label_segments(
+        whisper,
+        diarization,
+        args.max_gap_ms,
+        args.max_nearest_ms,
+        args.max_segment_ms,
+        args.max_segment_chars,
+    )
 
     metadata = {
         "asr_source": str(whisper_path),

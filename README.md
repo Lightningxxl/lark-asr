@@ -161,6 +161,9 @@ Useful environment knobs for the ASR command:
 - `LARK_ASR_DEVICE`
 - `LARK_ASR_FUNASR_MODEL`
 - `LARK_ASR_FUNASR_DEVICE`
+- `LARK_ASR_SPEAKER_MAX_GAP_MS` (default `1200`)
+- `LARK_ASR_SPEAKER_MAX_SEGMENT_MS` (default `30000`)
+- `LARK_ASR_SPEAKER_MAX_SEGMENT_CHARS` (default `180`)
 
 The ASR pipeline can normalize confirmed terminology from a knowledgebase
 Markdown file. Pass
@@ -170,6 +173,10 @@ Markdown file. Pass
 keeps its baseline decoding behavior, then confirmed aliases are replaced with
 their standard spellings before speaker labeling and punctuation restoration.
 Candidate terms remain available only to the Codex archive step.
+
+Speaker-labeled Whisper segments are merged only within the configured gap,
+duration, and character limits. These caps preserve readable sentence groups
+when diarization assigns a long stretch of audio to one speaker.
 
 The current FF1 host has an existing ASR environment at `/home/xavierx/codex-transcript-20260512/.venv/bin/python` and a local faster-whisper CT2 model at `/home/xavierx/codex-transcript-20260512/models/AI-ModelScope/whisper-large-v3-ct2-float16`. Docker should reuse the model files via `MODELS_DIR`, not mount the old virtualenv.
 

@@ -58,6 +58,9 @@ WHISPER_MODEL_DIR="${LARK_ASR_WHISPER_MODEL_DIR:-}"
 COMPUTE_TYPE="${LARK_ASR_COMPUTE_TYPE:-float16}"
 USE_WHISPER="${LARK_ASR_USE_WHISPER:-1}"
 RESTORE_PUNCTUATION="${LARK_ASR_RESTORE_PUNCTUATION:-1}"
+SPEAKER_MAX_GAP_MS="${LARK_ASR_SPEAKER_MAX_GAP_MS:-1200}"
+SPEAKER_MAX_SEGMENT_MS="${LARK_ASR_SPEAKER_MAX_SEGMENT_MS:-30000}"
+SPEAKER_MAX_SEGMENT_CHARS="${LARK_ASR_SPEAKER_MAX_SEGMENT_CHARS:-180}"
 
 mkdir -p "$OUT_DIR"
 
@@ -117,7 +120,10 @@ if [[ "$whisper_ok" == "1" && "$funasr_ok" == "1" && -f "$whisper_json" && -f "$
   "$PYTHON" "$SCRIPT_DIR/label_whisper_with_speakers.py" \
     --whisper-json "$whisper_json" \
     --speaker-json "$funasr_json" \
-    --out-prefix "$speaker_prefix"
+    --out-prefix "$speaker_prefix" \
+    --max-gap-ms "$SPEAKER_MAX_GAP_MS" \
+    --max-segment-ms "$SPEAKER_MAX_SEGMENT_MS" \
+    --max-segment-chars "$SPEAKER_MAX_SEGMENT_CHARS"
   if [[ "$RESTORE_PUNCTUATION" == "1" || "$RESTORE_PUNCTUATION" == "true" ]]; then
     if "$PYTHON" "$SCRIPT_DIR/restore_punctuation_funasr.py" \
       --input-json "$speaker_prefix.json" \
