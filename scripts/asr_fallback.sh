@@ -53,6 +53,10 @@ FUNASR_MODEL="${LARK_ASR_FUNASR_MODEL:-iic/speech_paraformer-large-vad-punc_asr_
 FUNASR_VAD_MODEL="${LARK_ASR_FUNASR_VAD_MODEL:-fsmn-vad}"
 FUNASR_PUNC_MODEL="${LARK_ASR_FUNASR_PUNC_MODEL:-ct-punc}"
 FUNASR_SPK_MODEL="${LARK_ASR_FUNASR_SPK_MODEL:-cam++}"
+SPEAKER_PROFILE="${LARK_ASR_SPEAKER_PROFILE:-}"
+SPEAKER_ID_DEVICE="${LARK_ASR_SPEAKER_ID_DEVICE:-$FUNASR_DEVICE}"
+SPEAKER_ID_THRESHOLD="${LARK_ASR_SPEAKER_ID_THRESHOLD:-}"
+SPEAKER_ID_MARGIN="${LARK_ASR_SPEAKER_ID_MARGIN:-}"
 WHISPER_MODEL="${LARK_ASR_WHISPER_MODEL:-large-v3}"
 WHISPER_MODEL_DIR="${LARK_ASR_WHISPER_MODEL_DIR:-}"
 COMPUTE_TYPE="${LARK_ASR_COMPUTE_TYPE:-float16}"
@@ -88,6 +92,36 @@ else
   echo "warning: FunASR failed; continuing if Whisper can produce text" >&2
 fi
 
+funasr_json="$FUNASR_DIR/$STEM.funasr.json"
+speaker_json="$funasr_json"
+speaker_funasr_prefix="$FUNASR_DIR/$STEM.funasr.identified"
+if [[ "$funasr_ok" == "1" && -n "$SPEAKER_PROFILE" ]]; then
+  if [[ ! -f "$SPEAKER_PROFILE" ]]; then
+    echo "speaker profile does not exist: $SPEAKER_PROFILE" >&2
+    exit 1
+  fi
+  speaker_id_args=(
+    "$SCRIPT_DIR/identify_speakers.py"
+    relabel
+    --audio "$INPUT"
+    --segments "$funasr_json"
+    --profile "$SPEAKER_PROFILE"
+    --device "$SPEAKER_ID_DEVICE"
+    --out-prefix "$speaker_funasr_prefix"
+  )
+  if [[ -n "$SPEAKER_ID_THRESHOLD" ]]; then
+    speaker_id_args+=(--threshold "$SPEAKER_ID_THRESHOLD")
+  fi
+  if [[ -n "$SPEAKER_ID_MARGIN" ]]; then
+    speaker_id_args+=(--margin "$SPEAKER_ID_MARGIN")
+  fi
+  if ! "$PYTHON" "${speaker_id_args[@]}"; then
+    echo "speaker identification failed" >&2
+    exit 1
+  fi
+  speaker_json="$speaker_funasr_prefix.json"
+fi
+
 whisper_ok=0
 if [[ "$USE_WHISPER" == "1" || "$USE_WHISPER" == "true" ]]; then
   mkdir -p "$WHISPER_DIR"
@@ -113,13 +147,12 @@ if [[ "$USE_WHISPER" == "1" || "$USE_WHISPER" == "true" ]]; then
 fi
 
 whisper_json="$WHISPER_DIR/$STEM.large-v3.json"
-funasr_json="$FUNASR_DIR/$STEM.funasr.json"
 
-if [[ "$whisper_ok" == "1" && "$funasr_ok" == "1" && -f "$whisper_json" && -f "$funasr_json" ]]; then
+if [[ "$whisper_ok" == "1" && "$funasr_ok" == "1" && -f "$whisper_json" && -f "$speaker_json" ]]; then
   speaker_prefix="$OUT_DIR/transcript.speakers"
   "$PYTHON" "$SCRIPT_DIR/label_whisper_with_speakers.py" \
     --whisper-json "$whisper_json" \
-    --speaker-json "$funasr_json" \
+    --speaker-json "$speaker_json" \
     --out-prefix "$speaker_prefix" \
     --max-gap-ms "$SPEAKER_MAX_GAP_MS" \
     --max-segment-ms "$SPEAKER_MAX_SEGMENT_MS" \
@@ -142,10 +175,10 @@ if [[ "$whisper_ok" == "1" && "$funasr_ok" == "1" && -f "$whisper_json" && -f "$
   exit 0
 fi
 
-if [[ "$funasr_ok" == "1" && -f "$FUNASR_DIR/$STEM.funasr.md" ]]; then
-  cp "$FUNASR_DIR/$STEM.funasr.md" "$FINAL_PREFIX.md"
-  cp "$FUNASR_DIR/$STEM.funasr.txt" "$FINAL_PREFIX.txt" 2>/dev/null || true
-  cp "$FUNASR_DIR/$STEM.funasr.json" "$FINAL_PREFIX.json" 2>/dev/null || true
+if [[ "$funasr_ok" == "1" && -f "${speaker_json%.json}.md" ]]; then
+  cp "${speaker_json%.json}.md" "$FINAL_PREFIX.md"
+  cp "${speaker_json%.json}.txt" "$FINAL_PREFIX.txt" 2>/dev/null || true
+  cp "$speaker_json" "$FINAL_PREFIX.json" 2>/dev/null || true
   echo "$FINAL_PREFIX.md"
   exit 0
 fi

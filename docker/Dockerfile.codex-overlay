@@ -1,6 +1,20 @@
 ARG ASR_RUNTIME_IMAGE=lark-asr/asr:local
 FROM ${ASR_RUNTIME_IMAGE}
 
+# Runtime images created from a Compose container can retain service labels.
+# Clear them so one-off containers cannot be mistaken for the production worker.
+LABEL com.docker.compose.config-hash="" \
+      com.docker.compose.container-number="" \
+      com.docker.compose.depends_on="" \
+      com.docker.compose.image="" \
+      com.docker.compose.oneoff="" \
+      com.docker.compose.project="" \
+      com.docker.compose.project.config_files="" \
+      com.docker.compose.project.working_dir="" \
+      com.docker.compose.replace="" \
+      com.docker.compose.service="" \
+      com.docker.compose.version=""
+
 ARG CODEX_CLI_VERSION=0.146.1
 ARG NPM_REGISTRY=https://registry.npmjs.org
 
