@@ -496,8 +496,8 @@ def merge_profiles(args: argparse.Namespace) -> None:
         "sample_rate": 16_000,
         "identities": merged_identities,
         "calibration": {
-            "suggested_threshold": max(thresholds, default=0.65),
-            "suggested_margin": max(margins, default=0.04),
+            "suggested_threshold": min(thresholds, default=0.65),
+            "suggested_margin": max([0.05, *margins]),
         },
         "source_profiles": [str(path) for path in args.profile],
     }
