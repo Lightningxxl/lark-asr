@@ -46,6 +46,7 @@ env \
   LARK_ASR_USE_WHISPER=1 \
   LARK_ASR_DEVICE=cuda \
   LARK_ASR_FUNASR_DEVICE=cuda:0 \
+  LARK_ASR_SPEAKER_PROFILE=/home/xavierx/projects/lark-asr/data/speaker-profiles/xfx-team.json \
   /home/xavierx/projects/lark-asr/scripts/asr_fallback.sh \
   --input {media_path} \
   --output-dir {job_dir}/local_asr \
