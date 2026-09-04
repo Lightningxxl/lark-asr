@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enroll and evaluate closed-set speaker identities from diarized meetings."""
+"""Enroll and apply conservative closed-set speaker identities to diarized meetings."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import argparse
 import itertools
 import json
 import math
+import re
 import subprocess
 from collections import defaultdict
 from pathlib import Path
@@ -83,6 +84,24 @@ def select_chunks(
             int(chunk["start_ms"]),
         ),
     )[:limit]
+
+
+def sample_timeline_chunks(
+    chunks: list[dict[str, Any]],
+    *,
+    minimum_ms: int = 4_000,
+    limit: int = 120,
+) -> list[dict[str, Any]]:
+    """Keep useful chunks distributed over the full meeting timeline."""
+    eligible = [
+        chunk
+        for chunk in chunks
+        if int(chunk["end_ms"]) - int(chunk["start_ms"]) >= minimum_ms
+    ]
+    if len(eligible) <= limit:
+        return eligible
+    indexes = np.linspace(0, len(eligible) - 1, num=limit, dtype=int)
+    return [eligible[int(index)] for index in indexes]
 
 
 def robust_centroid(embeddings: list[np.ndarray]) -> tuple[np.ndarray, list[int]]:
@@ -236,25 +255,25 @@ def extract_embeddings(
     chunks: list[dict[str, Any]],
     *,
     model: Any,
+    batch_size: int = 16,
 ) -> list[np.ndarray]:
-    samples = [
-        load_audio_chunk(
-            audio_path,
-            max(0, int(chunk["start_ms"])),
-            int(chunk["end_ms"]),
-        )
-        for chunk in chunks
-    ]
-    if not samples:
-        return []
-
-    results = model.generate(input=samples, cache={}, is_final=True)
-    embeddings = []
-    for result in results:
-        embedding = result["spk_embedding"]
-        if hasattr(embedding, "detach"):
-            embedding = embedding.detach().cpu().numpy()
-        embeddings.append(normalize(np.asarray(embedding)))
+    embeddings: list[np.ndarray] = []
+    for offset in range(0, len(chunks), batch_size):
+        batch = chunks[offset : offset + batch_size]
+        samples = [
+            load_audio_chunk(
+                audio_path,
+                max(0, int(chunk["start_ms"])),
+                int(chunk["end_ms"]),
+            )
+            for chunk in batch
+        ]
+        results = model.generate(input=samples, cache={}, is_final=True)
+        for result in results:
+            embedding = result["spk_embedding"]
+            if hasattr(embedding, "detach"):
+                embedding = embedding.detach().cpu().numpy()
+            embeddings.append(normalize(np.asarray(embedding)))
     return embeddings
 
 
@@ -266,12 +285,14 @@ def prepare_speaker_embeddings(
     device: str,
     minimum_ms: int,
     chunk_limit: int,
+    sample_timeline: bool,
 ) -> tuple[dict[str, list[np.ndarray]], dict[str, list[dict[str, Any]]]]:
     from funasr import AutoModel
 
     grouped = merge_speaker_segments(load_segments(segments_path))
+    selector = sample_timeline_chunks if sample_timeline else select_chunks
     selected = {
-        speaker: select_chunks(chunks, minimum_ms=minimum_ms, limit=chunk_limit)
+        speaker: selector(chunks, minimum_ms=minimum_ms, limit=chunk_limit)
         for speaker, chunks in grouped.items()
     }
     selected = {speaker: chunks for speaker, chunks in selected.items() if chunks}
@@ -295,6 +316,7 @@ def enroll(args: argparse.Namespace) -> None:
         device=args.device,
         minimum_ms=args.minimum_ms,
         chunk_limit=args.chunk_limit,
+        sample_timeline=False,
     )
 
     identities: dict[str, list[np.ndarray]] = defaultdict(list)
@@ -379,7 +401,81 @@ def enroll(args: argparse.Namespace) -> None:
     print(json.dumps(profile, ensure_ascii=False, indent=2))
 
 
-def identify(args: argparse.Namespace) -> None:
+def score_embedding(
+    embedding: np.ndarray,
+    identities: dict[str, list[np.ndarray]],
+    *,
+    threshold: float,
+    margin: float,
+) -> dict[str, Any]:
+    scores = {
+        name: max(float(normalize(embedding) @ prototype) for prototype in prototypes)
+        for name, prototypes in identities.items()
+    }
+    ranked = sorted(scores, key=scores.get, reverse=True)
+    best_name = ranked[0]
+    best_score = scores[best_name]
+    runner_up = ranked[1] if len(ranked) > 1 else None
+    runner_up_score = scores[runner_up] if runner_up is not None else -1.0
+    accepted = best_score >= threshold and best_score - runner_up_score >= margin
+    return {
+        "identity": best_name if accepted else "UNKNOWN",
+        "score": round(best_score, 6),
+        "runner_up": runner_up,
+        "runner_up_score": round(runner_up_score, 6),
+        "margin": round(best_score - runner_up_score, 6),
+        "accepted": accepted,
+        "scores": {name: round(score, 6) for name, score in scores.items()},
+    }
+
+
+def decide_cluster_mode(
+    cluster_assignment: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    *,
+    mixed_min_chunks: int = 2,
+    mixed_min_duration_ms: int = 8_000,
+) -> dict[str, Any]:
+    accepted_duration: dict[str, int] = defaultdict(int)
+    accepted_chunks: dict[str, int] = defaultdict(int)
+    for item in evidence:
+        identity = item["identity"]
+        if identity == "UNKNOWN":
+            continue
+        start_ms, end_ms = item["range_ms"]
+        accepted_duration[identity] += max(0, int(end_ms) - int(start_ms))
+        accepted_chunks[identity] += 1
+
+    material_identities = sorted(
+        identity
+        for identity, duration_ms in accepted_duration.items()
+        if accepted_chunks[identity] >= mixed_min_chunks
+        and duration_ms >= mixed_min_duration_ms
+    )
+    cluster_identity = cluster_assignment.get("identity", "UNKNOWN")
+    conflicting = [name for name in material_identities if name != cluster_identity]
+    if cluster_identity != "UNKNOWN" and not conflicting:
+        mode = "stable"
+        identity = cluster_identity
+    elif len(material_identities) >= 2:
+        mode = "mixed"
+        identity = None
+    elif material_identities:
+        mode = "partial"
+        identity = None
+    else:
+        mode = "unidentified"
+        identity = None
+    return {
+        "mode": mode,
+        "identity": identity,
+        "material_identities": material_identities,
+        "accepted_duration_ms": dict(sorted(accepted_duration.items())),
+        "accepted_chunks": dict(sorted(accepted_chunks.items())),
+    }
+
+
+def analyze_speakers(args: argparse.Namespace) -> dict[str, Any]:
     profile = json.loads(args.profile.read_text(encoding="utf-8"))
     model_name = args.model or profile["model"]
     identities = {
@@ -392,11 +488,20 @@ def identify(args: argparse.Namespace) -> None:
         model_name=model_name,
         device=args.device,
         minimum_ms=args.minimum_ms,
-        chunk_limit=args.chunk_limit,
+        chunk_limit=args.timeline_limit,
+        sample_timeline=True,
     )
-    speaker_centroids = {
-        speaker: robust_centroid(items)[0] for speaker, items in embeddings.items()
-    }
+    speaker_centroids: dict[str, np.ndarray] = {}
+    for speaker, speaker_embeddings in embeddings.items():
+        pairs = sorted(
+            zip(chunks[speaker], speaker_embeddings),
+            key=lambda item: -(
+                int(item[0]["end_ms"]) - int(item[0]["start_ms"])
+            ),
+        )[: args.chunk_limit]
+        speaker_centroids[speaker] = robust_centroid(
+            [embedding for _, embedding in pairs]
+        )[0]
     labels, names, scores = similarity_matrix(identities, speaker_centroids)
     calibration = profile.get("calibration", {})
     threshold = args.threshold
@@ -411,30 +516,20 @@ def identify(args: argparse.Namespace) -> None:
     for speaker, speaker_embeddings in embeddings.items():
         evidence = []
         for chunk, embedding in zip(chunks[speaker], speaker_embeddings):
-            chunk_scores = {
-                name: max(
-                    float(normalize(embedding) @ prototype)
-                    for prototype in prototypes
-                )
-                for name, prototypes in identities.items()
-            }
-            ranked = sorted(chunk_scores, key=chunk_scores.get, reverse=True)
-            best_name = ranked[0]
-            best_score = chunk_scores[best_name]
-            runner_up_score = chunk_scores[ranked[1]] if len(ranked) > 1 else -1.0
-            accepted = best_score >= threshold and best_score - runner_up_score >= margin
-            evidence.append(
-                {
-                    "range_ms": [int(chunk["start_ms"]), int(chunk["end_ms"])],
-                    "identity": best_name if accepted else "UNKNOWN",
-                    "score": round(best_score, 6),
-                    "margin": round(best_score - runner_up_score, 6),
-                    "scores": {
-                        name: round(score, 6) for name, score in chunk_scores.items()
-                    },
-                }
+            item = score_embedding(
+                embedding,
+                identities,
+                threshold=threshold,
+                margin=margin,
             )
+            item["range_ms"] = [int(chunk["start_ms"]), int(chunk["end_ms"])]
+            evidence.append(item)
         chunk_evidence[speaker] = evidence
+
+    decisions = {
+        speaker: decide_cluster_mode(assignments[speaker], chunk_evidence[speaker])
+        for speaker in assignments
+    }
 
     result = {
         "audio": str(args.audio),
@@ -447,6 +542,7 @@ def identify(args: argparse.Namespace) -> None:
             for row, label in enumerate(labels)
         },
         "assignments": assignments,
+        "decisions": decisions,
         "chunk_evidence": chunk_evidence,
         "selected_chunks": {
             speaker: [
@@ -455,11 +551,133 @@ def identify(args: argparse.Namespace) -> None:
             for speaker, speaker_chunks in chunks.items()
         },
     }
+    return result
+
+
+def identify(args: argparse.Namespace) -> None:
+    result = analyze_speakers(args)
     serialized = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(serialized, encoding="utf-8")
     print(serialized, end="")
+
+
+def nearest_evidence_identity(
+    segment: dict[str, Any],
+    evidence: list[dict[str, Any]],
+    *,
+    max_nearest_ms: int,
+) -> str | None:
+    start_ms = int(segment["start_ms"])
+    end_ms = int(segment["end_ms"])
+    best: tuple[int, int, str] | None = None
+    for item in evidence:
+        identity = item["identity"]
+        if identity == "UNKNOWN":
+            continue
+        item_start, item_end = (int(value) for value in item["range_ms"])
+        overlap = max(0, min(end_ms, item_end) - max(start_ms, item_start))
+        distance = 0 if overlap else min(abs(start_ms - item_end), abs(end_ms - item_start))
+        candidate = (overlap, -distance, identity)
+        if best is None or candidate > best:
+            best = candidate
+    if best is None or (best[0] == 0 and -best[1] > max_nearest_ms):
+        return None
+    return best[2]
+
+
+def relabel_segments(
+    segments: list[dict[str, Any]],
+    report: dict[str, Any],
+    *,
+    max_nearest_ms: int = 30_000,
+) -> list[dict[str, Any]]:
+    output = []
+    for original in segments:
+        segment = dict(original)
+        speaker = str(segment.get("speaker") or "UNKNOWN")
+        decision = report["decisions"].get(speaker, {"mode": "unidentified"})
+        identity: str | None = None
+        if decision["mode"] == "stable":
+            identity = decision["identity"]
+        elif decision["mode"] in {"mixed", "partial"}:
+            identity = nearest_evidence_identity(
+                segment,
+                report["chunk_evidence"].get(speaker, []),
+                max_nearest_ms=max_nearest_ms,
+            )
+        if identity:
+            segment["speaker_diarization"] = speaker
+            segment["speaker"] = identity
+        output.append(segment)
+    return output
+
+
+def stamp(ms: int | float) -> str:
+    total_ms = int(round(float(ms)))
+    hours, rem = divmod(total_ms, 3_600_000)
+    minutes, rem = divmod(rem, 60_000)
+    seconds, millis = divmod(rem, 1000)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{millis:03d}"
+
+
+def write_transcript(prefix: Path, payload: dict[str, Any]) -> None:
+    segments = payload["segments"]
+    txt_lines = [
+        f"[{stamp(item['start_ms'])} - {stamp(item['end_ms'])}] "
+        f"{item.get('speaker') or 'SPEAKER_??'}: {item.get('text', '')}"
+        for item in segments
+    ]
+    Path(f"{prefix}.txt").write_text("\n".join(txt_lines) + "\n", encoding="utf-8")
+
+    metadata = payload.get("metadata", {})
+    md_lines = [
+        "# Transcript",
+        "",
+        f"- Source: `{metadata.get('source', '')}`",
+        f"- ASR model: `{metadata.get('model', '')}`",
+        f"- Speaker model: `{metadata.get('spk_model', '')}`",
+        f"- Speaker profile: `{metadata.get('speaker_identity', {}).get('profile', '')}`",
+        "",
+        "| Time | Speaker | Text |",
+        "|---|---|---|",
+    ]
+    for item in segments:
+        text = re.sub(r"\s+", " ", str(item.get("text", ""))).replace("|", "\\|")
+        speaker = item.get("speaker") or "SPEAKER_??"
+        md_lines.append(
+            f"| {stamp(item['start_ms'])} - {stamp(item['end_ms'])} | {speaker} | {text} |"
+        )
+    Path(f"{prefix}.md").write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+
+
+def relabel(args: argparse.Namespace) -> None:
+    report = analyze_speakers(args)
+    payload = json.loads(args.segments.read_text(encoding="utf-8"))
+    payload["segments"] = relabel_segments(
+        payload["segments"], report, max_nearest_ms=args.max_nearest_ms
+    )
+    metadata = dict(payload.get("metadata", {}))
+    metadata["speaker_identity"] = {
+        "profile": str(args.profile),
+        "model": report["model"],
+        "threshold": report["threshold"],
+        "margin": report["margin"],
+        "decisions": report["decisions"],
+        "assignments": report["assignments"],
+    }
+    payload["metadata"] = metadata
+    args.out_prefix.parent.mkdir(parents=True, exist_ok=True)
+    Path(f"{args.out_prefix}.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    write_transcript(args.out_prefix, payload)
+    report_path = Path(f"{args.out_prefix}.speaker-id.json")
+    report_path.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    print(Path(f"{args.out_prefix}.json"))
 
 
 def merge_profiles(args: argparse.Namespace) -> None:
@@ -515,11 +733,13 @@ def build_parser() -> argparse.ArgumentParser:
     common.add_argument("--audio", type=Path, required=True)
     common.add_argument("--segments", type=Path, required=True)
     common.add_argument("--device", default="cuda:0")
-    common.add_argument("--model", default="cam++")
+    common.add_argument("--model")
     common.add_argument("--minimum-ms", type=int, default=4_000)
     common.add_argument("--chunk-limit", type=int, default=12)
+    common.add_argument("--timeline-limit", type=int, default=120)
 
     enroll_parser = subparsers.add_parser("enroll", parents=[common])
+    enroll_parser.set_defaults(model="cam++")
     enroll_parser.add_argument("--label", action="append", required=True)
     enroll_parser.add_argument("--output", type=Path, required=True)
     enroll_parser.set_defaults(func=enroll)
@@ -530,6 +750,14 @@ def build_parser() -> argparse.ArgumentParser:
     identify_parser.add_argument("--margin", type=float)
     identify_parser.add_argument("--output", type=Path)
     identify_parser.set_defaults(func=identify)
+
+    relabel_parser = subparsers.add_parser("relabel", parents=[common])
+    relabel_parser.add_argument("--profile", type=Path, required=True)
+    relabel_parser.add_argument("--threshold", type=float)
+    relabel_parser.add_argument("--margin", type=float)
+    relabel_parser.add_argument("--max-nearest-ms", type=int, default=30_000)
+    relabel_parser.add_argument("--out-prefix", type=Path, required=True)
+    relabel_parser.set_defaults(func=relabel)
 
     merge_parser = subparsers.add_parser("merge")
     merge_parser.add_argument("--profile", type=Path, action="append", required=True)
