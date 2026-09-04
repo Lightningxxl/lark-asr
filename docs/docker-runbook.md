@@ -24,7 +24,7 @@ The containers should own the application runtime. Host paths are only for:
 - `compose.yaml`: Docker-first poller and worker services.
 - `Dockerfile`: lightweight app image with Python, `lark-cli`, and Codex CLI.
 - `docker/Dockerfile.asr`: GPU worker image with app runtime plus ASR dependencies. It defaults to the same Debian/Node base as the app image and uses CUDA-enabled Python wheels to avoid pulling a large NVIDIA CUDA base image on FF1's slow Docker Hub path.
-- `docker/Dockerfile.codex-overlay`: Codex-only maintenance image layered on an existing worker image. Use it for CLI/model upgrades so ASR and CUDA Python dependencies are not rebuilt.
+- `docker/Dockerfile.codex-overlay`: thin maintenance image layered on an existing worker image. Use it for application or Codex CLI upgrades so ASR and CUDA Python dependencies are not rebuilt. It also clears inherited Compose service labels from runtime snapshots.
 - `config/docker.example.toml`: container paths and commands.
 - `.env.example`: FF1 path bindings and image pins.
 - `scripts/bootstrap_docker_project.sh`: creates local config/data/work folders.

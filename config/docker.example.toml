@@ -46,6 +46,7 @@ env \
   LARK_ASR_DEVICE=cuda \
   LARK_ASR_FUNASR_MODEL=iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch \
   LARK_ASR_FUNASR_DEVICE=cuda:0 \
+  LARK_ASR_SPEAKER_PROFILE=/data/speaker-profiles/xfx-team.json \
   /app/scripts/asr_fallback.sh \
   --input {media_path} \
   --output-dir {job_dir}/local_asr \

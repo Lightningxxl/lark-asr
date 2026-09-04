@@ -146,6 +146,7 @@ When running under Docker Compose, use `/app/scripts/asr_fallback.sh` for the bu
 The repo includes `scripts/asr_fallback.sh`, which uses bundled helper scripts:
 
 - `transcribe_funasr.py` for FunASR/SenseVoice + VAD + punctuation + CAM++ speaker labels.
+- `identify_speakers.py` to conservatively replace anonymous CAM++ clusters with enrolled speaker names.
 - `transcribe_faster_whisper.py` for Whisper large-v3 text when `faster-whisper` is available.
 - `label_whisper_with_speakers.py` to preserve Whisper segments and assign FunASR speaker labels.
 - `restore_punctuation_funasr.py` to restore punctuation on the final speaker-labeled Whisper transcript.
@@ -161,6 +162,10 @@ Useful environment knobs for the ASR command:
 - `LARK_ASR_DEVICE`
 - `LARK_ASR_FUNASR_MODEL`
 - `LARK_ASR_FUNASR_DEVICE`
+- `LARK_ASR_SPEAKER_PROFILE` (optional private CAM++ profile JSON)
+- `LARK_ASR_SPEAKER_ID_DEVICE` (defaults to the FunASR device)
+- `LARK_ASR_SPEAKER_ID_THRESHOLD` (defaults to profile calibration)
+- `LARK_ASR_SPEAKER_ID_MARGIN` (defaults to profile calibration)
 - `LARK_ASR_SPEAKER_MAX_GAP_MS` (default `1200`)
 - `LARK_ASR_SPEAKER_MAX_SEGMENT_MS` (default `30000`)
 - `LARK_ASR_SPEAKER_MAX_SEGMENT_CHARS` (default `180`)
@@ -177,6 +182,14 @@ Candidate terms remain available only to the Codex archive step.
 Speaker-labeled Whisper segments are merged only within the configured gap,
 duration, and character limits. These caps preserve readable sentence groups
 when diarization assigns a long stretch of audio to one speaker.
+
+When `LARK_ASR_SPEAKER_PROFILE` is configured, the pipeline runs closed-set
+speaker identification after CAM++ diarization. Stable clusters receive an
+enrolled name. A cluster containing evidence for multiple enrolled people is
+labelled from its local timeline evidence. Low-confidence regions keep their
+original `SPEAKER_XX` label. Store profiles under the mounted data directory,
+for example `/data/speaker-profiles/xfx-team.json`; voice embeddings are private
+runtime data and are not committed to Git.
 
 The current FF1 host has an existing ASR environment at `/home/xavierx/codex-transcript-20260512/.venv/bin/python` and a local faster-whisper CT2 model at `/home/xavierx/codex-transcript-20260512/models/AI-ModelScope/whisper-large-v3-ct2-float16`. Docker should reuse the model files via `MODELS_DIR`, not mount the old virtualenv.
 
