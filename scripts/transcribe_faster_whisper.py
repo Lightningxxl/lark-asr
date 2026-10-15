@@ -9,6 +9,7 @@ from pathlib import Path
 CONFIRMED_HOTWORDS_HEADING = "## 已确认热词"
 MAX_TERMS = 100
 MAX_TERMINOLOGY_CHARS = 2_400
+MAX_HOTWORD_TOKENS = 200
 
 
 def load_confirmed_terminology(path: Path) -> list[dict]:
@@ -74,6 +75,23 @@ def load_confirmed_terminology(path: Path) -> list[dict]:
                 )
             variant_owners[key] = standard
     return terms
+
+
+def build_decode_hotwords(terms: list[dict], tokenizer, context: str) -> tuple[str | None, list[str]]:
+    selected: list[str] = []
+    omitted: list[str] = []
+    # Budget complete canonical names using Whisper's tokenizer; aliases stay in postprocessing.
+    for term in terms:
+        standard = term["standard"]
+        if not any(re.search(alias_pattern(variant), context, flags=re.IGNORECASE)
+                   for variant in [standard, *term["aliases"]]):
+            continue
+        candidate = ", ".join([*selected, standard])
+        if len(tokenizer.encode(" " + candidate, add_special_tokens=False).ids) <= MAX_HOTWORD_TOKENS:
+            selected.append(standard)
+        else:
+            omitted.append(standard)
+    return ", ".join(selected) or None, omitted
 
 
 def alias_pattern(alias: str) -> str:
@@ -160,6 +178,7 @@ def main() -> None:
     parser.add_argument("--language", default=None)
     parser.add_argument("--beam-size", type=int, default=5)
     parser.add_argument("--terminology-file", default=None)
+    parser.add_argument("--terminology-context", default=None)
     args = parser.parse_args()
 
     audio = Path(args.audio).expanduser().resolve()
@@ -170,6 +189,8 @@ def main() -> None:
         Path(args.terminology_file).expanduser().resolve() if args.terminology_file else None
     )
     terminology = load_confirmed_terminology(terminology_path) if terminology_path else []
+    context_path = Path(args.terminology_context).expanduser().resolve() if args.terminology_context else None
+    terminology_context = context_path.read_text(encoding="utf-8") if context_path else ""
 
     started = time.time()
     from faster_whisper import WhisperModel
@@ -180,6 +201,7 @@ def main() -> None:
         compute_type=args.compute_type,
         download_root=args.model_dir,
     )
+    decode_hotwords, omitted_hotwords = build_decode_hotwords(terminology, model.hf_tokenizer, terminology_context)
     segments_iter, info = model.transcribe(
         str(audio),
         language=args.language,
@@ -188,6 +210,7 @@ def main() -> None:
         vad_parameters={"min_silence_duration_ms": 500},
         word_timestamps=True,
         condition_on_previous_text=False,
+        hotwords=decode_hotwords,
     )
 
     segments = []
@@ -231,6 +254,9 @@ def main() -> None:
         "duration_after_vad": getattr(info, "duration_after_vad", None),
         "terminology_source": str(terminology_path) if terminology_path else None,
         "terminology_count": len(terminology),
+        "decode_hotwords": decode_hotwords,
+        "decode_hotwords_context": str(context_path) if context_path else None,
+        "decode_hotwords_omitted": omitted_hotwords,
         "terminology_corrections": terminology_corrections,
         "elapsed_seconds": round(time.time() - started, 3),
     }

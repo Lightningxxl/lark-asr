@@ -45,6 +45,41 @@ def init_knowledgebase_repo(root: Path) -> Path:
 
 
 class PipelineTest(unittest.TestCase):
+    def test_asr_reads_synced_knowledgebase_and_stops_on_dirty_checkout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            kb = init_knowledgebase_repo(root)
+            other = root / "other"
+            git(["clone", str(root / "origin.git"), str(other)], root)
+            configure_git_user(other)
+            (other / "README.md").write_text("latest terminology\n")
+            git(["add", "README.md"], other)
+            git(["commit", "-m", "update terms"], other)
+            git(["push", "origin", "main"], other)
+            config = Config(
+                paths=PathsConfig(state_dir=root / "data", work_dir=root / "work", knowledgebase_dir=kb),
+                pipeline=PipelineConfig(minimum_transcript_chars=1),
+                asr=AsrConfig(enabled=True, command="cp {knowledgebase_dir}/README.md {job_dir}/transcript.md", output_glob="transcript.md"),
+            )
+            config.ensure_dirs()
+            store = Store(config.db_path)
+            try:
+                store.init()
+                pipeline = Pipeline(config, store)
+                job = store.enqueue_seed(seed_from_manual(media_path=str(root / "audio.opus")))
+                job_dir = pipeline.job_dir(job)
+                job_dir.mkdir(parents=True)
+                result = pipeline.run_asr(job, root / "audio.opus", job_dir)
+                self.assertIsNotNone(result)
+                self.assertEqual(result.read_text(), "latest terminology\n")
+                result.unlink()
+                (kb / "README.md").write_text("uncommitted changes\n")
+                self.assertIsNone(pipeline.run_asr(job, root / "audio.opus", job_dir))
+                self.assertFalse(result.exists())
+                self.assertIn("before ASR", store.get(job.id).last_error)
+            finally:
+                store.close()
+
     def test_gpu_runtime_failure_schedules_asr_retry(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

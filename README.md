@@ -170,14 +170,28 @@ Useful environment knobs for the ASR command:
 - `LARK_ASR_SPEAKER_MAX_SEGMENT_MS` (default `30000`)
 - `LARK_ASR_SPEAKER_MAX_SEGMENT_CHARS` (default `180`)
 
-The ASR pipeline can normalize confirmed terminology from a knowledgebase
+The ASR pipeline uses confirmed terminology from a knowledgebase
 Markdown file. Pass
 `--terminology-file {knowledgebase_dir}/company/ASR热词库.md` to
 `asr_fallback.sh`, or set `LARK_ASR_TERMINOLOGY_FILE`. The file must contain an
 `## 已确认热词` Markdown table with `标准写法` and `常见误识别` columns. Whisper
-keeps its baseline decoding behavior, then confirmed aliases are replaced with
-their standard spellings before speaker labeling and punctuation restoration.
-Candidate terms remain available only to the Codex archive step.
+receives canonical spellings through its `hotwords` decoding argument. The
+preceding FunASR transcript selects terms whose standard spelling or recorded
+alias occurs in this meeting. Complete names are selected in table order within
+a 200-token budget measured by the model
+tokenizer; metadata records the prompt and any omitted names. Confirmed aliases
+are then replaced with their standard spellings before speaker labeling and
+punctuation restoration. Candidate terms remain available only to the Codex
+archive step; incorrect aliases are used only for output normalization.
+
+The wrapper passes the FunASR text as `--terminology-context` to the Whisper
+script. Without context or matching terms, decoding receives no hints and output
+normalization still uses the confirmed table. This avoids injecting unrelated
+names from the entire knowledgebase into every recording.
+
+Before an ASR command referencing `{knowledgebase_dir}` runs, the worker syncs
+the clean knowledgebase checkout from origin. Sync failures stop the task before
+ASR. Standalone script callers supply their own current terminology file.
 
 Speaker-labeled Whisper segments are merged only within the configured gap,
 duration, and character limits. These caps preserve readable sentence groups

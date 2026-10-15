@@ -271,6 +271,12 @@ class Pipeline:
             self.store.log(job.id, "warning", "ASR fallback is needed but disabled")
             return None
 
+        if "{knowledgebase_dir}" in self.config.asr.command:
+            sync_dir = job_dir / "asr"
+            sync_dir.mkdir(parents=True, exist_ok=True)
+            if not self.prepare_knowledgebase_git(job, sync_dir, phase="ASR"):
+                return None
+
         self.store.update(job.id, status="running_asr")
         command = format_template(
             self.config.asr.command,
@@ -430,22 +436,22 @@ class Pipeline:
     def job_dir(self, job: Job) -> Path:
         return self.config.paths.work_dir / sanitize_filename(job.id)
 
-    def prepare_knowledgebase_git(self, job: Job, codex_dir: Path) -> bool:
+    def prepare_knowledgebase_git(self, job: Job, codex_dir: Path, phase: str = "Codex") -> bool:
         branch = self.knowledgebase_branch(job, codex_dir)
         if not branch:
             return False
-        if not self.ensure_clean_knowledgebase(job, codex_dir, "before Codex"):
+        if not self.ensure_clean_knowledgebase(job, codex_dir, f"before {phase}"):
             return False
-        if not self.run_git_or_fail(job, codex_dir, "fetch-before-codex", ["fetch", "origin"]):
+        if not self.run_git_or_fail(job, codex_dir, f"fetch-before-{phase.lower()}", ["fetch", "origin"]):
             return False
         if not self.run_git_or_fail(
             job,
             codex_dir,
-            "rebase-before-codex",
+            f"rebase-before-{phase.lower()}",
             ["rebase", f"origin/{branch}"],
         ):
             return False
-        self.store.log(job.id, "info", "knowledgebase git synced before Codex", {"branch": branch})
+        self.store.log(job.id, "info", f"knowledgebase git synced before {phase}", {"branch": branch})
         return True
 
     def finalize_knowledgebase_git(self, job: Job, codex_dir: Path) -> bool:
