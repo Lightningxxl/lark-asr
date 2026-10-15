@@ -138,6 +138,9 @@ if [[ "$USE_WHISPER" == "1" || "$USE_WHISPER" == "true" ]]; then
   fi
   if [[ -n "$TERMINOLOGY_FILE" ]]; then
     whisper_args+=(--terminology-file "$TERMINOLOGY_FILE")
+    if [[ "$funasr_ok" == "1" ]]; then
+      whisper_args+=(--terminology-context "$FUNASR_DIR/$STEM.funasr.txt")
+    fi
   fi
   if "$PYTHON" "${whisper_args[@]}"; then
     whisper_ok=1

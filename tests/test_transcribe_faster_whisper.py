@@ -1,7 +1,11 @@
 import importlib.util
+import json
 from pathlib import Path
+import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import MagicMock, patch
 
 
 def load_script():
@@ -15,6 +19,50 @@ def load_script():
 
 
 class TranscribeFasterWhisperTest(unittest.TestCase):
+    def test_decode_hotwords_budget_preserves_complete_standard_names(self):
+        module = load_script()
+        tokenizer = MagicMock()
+        tokenizer.encode.side_effect = lambda text, **kwargs: SimpleNamespace(ids=list(text))
+        terms = [
+            {"standard": "ORIA", "aliases": ["Aurea"]},
+            {"standard": "too long for this budget", "aliases": []},
+            {"standard": "DSPy", "aliases": []},
+        ]
+        with patch.object(module, "MAX_HOTWORD_TOKENS", 11):
+            hotwords, omitted = module.build_decode_hotwords(terms, tokenizer, "Aurea DSPy too long for this budget")
+        self.assertEqual(hotwords, "ORIA, DSPy")
+        self.assertEqual(omitted, ["too long for this budget"])
+        self.assertEqual(module.build_decode_hotwords([], tokenizer, ""), (None, []))
+        self.assertEqual(module.build_decode_hotwords(terms, tokenizer, ""), (None, []))
+        self.assertEqual(module.build_decode_hotwords(terms, tokenizer, "Aureas"), (None, []))
+        self.assertEqual(module.build_decode_hotwords(terms, tokenizer, "Aurea"), ("ORIA", []))
+
+    def test_main_passes_hotwords_to_decoder_and_keeps_normalization(self):
+        module = load_script()
+        for use_terms in (True, False):
+            with self.subTest(use_terms=use_terms), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                terms = root / "terms.md"
+                terms.write_text("## 已确认热词\n| ORIA | Aurea |\n## 候选热词\n| Guess | wrong |\n", encoding="utf-8")
+                model = MagicMock()
+                model.hf_tokenizer.encode.return_value = SimpleNamespace(ids=[1, 2])
+                segment = SimpleNamespace(id=0, start=0, end=1, text="Aurea", words=[],
+                                          avg_logprob=-0.1, compression_ratio=1, no_speech_prob=0)
+                model.transcribe.return_value = (iter([segment]), SimpleNamespace(duration=1))
+                whisper = SimpleNamespace(WhisperModel=MagicMock(return_value=model))
+                argv = ["transcribe", str(root / "audio.wav"), "--out-dir", str(root)]
+                if use_terms:
+                    context = root / "context.txt"
+                    context.write_text("Aurea", encoding="utf-8")
+                    argv += ["--terminology-file", str(terms), "--terminology-context", str(context)]
+                with patch.dict(sys.modules, {"faster_whisper": whisper}), patch.object(sys, "argv", argv):
+                    module.main()
+                self.assertEqual(model.transcribe.call_args.kwargs["hotwords"], "ORIA" if use_terms else None)
+                result = json.loads((root / "audio.large-v3.json").read_text())
+                self.assertEqual(result["metadata"]["decode_hotwords"], "ORIA" if use_terms else None)
+                self.assertEqual(result["metadata"]["decode_hotwords_omitted"], [])
+                self.assertEqual(result["segments"][0]["text"], "ORIA" if use_terms else "Aurea")
+
     def test_loads_only_confirmed_terminology_and_deduplicates(self):
         module = load_script()
         content = """# ASR热词库
