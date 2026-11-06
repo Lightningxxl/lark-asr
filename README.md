@@ -1,6 +1,6 @@
 # lark-asr
 
-Feishu/Lark transcript-first meeting ingestion for host.
+Feishu/Lark transcript-first meeting ingestion with local ASR fallback.
 
 The intended flow is:
 
@@ -8,12 +8,12 @@ The intended flow is:
 2. Optionally ingest NDJSON Feishu events with `lark-asr hook --stdin` for one-off integrations.
 3. Resolve `minute_token` from a minutes URL, meeting ID, calendar event ID, Minutes search, or recorded-meeting search result.
 4. Prefer Feishu's generated transcript.
-5. If Feishu has media but no usable transcript, run a local ASR command on host.
+5. If Feishu has media but no usable transcript, run a local ASR command on the host.
 6. Hand the transcript to Codex inside the knowledgebase repo.
 
 This deliberately uses transcript/media artifacts as the source of truth. When Feishu returns a transcript, the worker checks whether the last transcript timestamp covers enough of the declared or probed media duration. If the transcript appears partial, it downloads the media and falls back to local ASR. If you already know the Feishu quota is exhausted, set `force_local_asr = true` under `[pipeline]` to skip Feishu transcript import and transcribe locally.
 
-## Quick Start On host
+## Quick Start
 
 The intended managed deployment is Docker Compose:
 
@@ -37,7 +37,7 @@ The Compose deployment uses:
 - `data/`: SQLite state.
 - `work/`: job artifacts.
 
-host currently still has a host-run `systemd --user` MVP online. See `docs/host-current-state-2026-05-13.md` before migrating it to Docker.
+A host-run `systemd --user` deployment is also supported; see the host-run section below.
 
 ## Host-Run Fallback
 
@@ -46,12 +46,12 @@ Use this only as a fallback while Docker GPU/runtime/network prerequisites are b
 ```bash
 git clone https://github.com/Lightningxxl/lark-asr.git
 cd lark-asr
-cp config/host-host.example.toml config.toml
+cp config/host.example.toml config.toml
 $EDITOR config.toml
 ./bin/lark-asr init --config config.toml
 ```
 
-On host the sample config assumes:
+The host-run sample config uses these placeholders:
 
 - `lark-cli`: `/path/to/.local/share/mise/installs/node/22.22.2/bin/lark-cli`
 - lark-cli config dir: `/path/to/.config/lark-cli`
@@ -59,7 +59,7 @@ On host the sample config assumes:
 - Knowledgebase repo: `/path/to/projects/knowledgebase`
 - Node bin path for lark-cli: `/path/to/.local/share/mise/installs/node/22.22.2/bin`
 
-If the knowledgebase repo is not present on host yet, keep `[codex].enabled = false` until it is cloned there.
+If the knowledgebase repo is not present on the host yet, keep `[codex].enabled = false` until it is cloned there.
 
 If `lark-asr doctor` reports auth failure, rerun `lark-cli auth login` for the config dir before starting the poller. The service intentionally does not store app secrets or refresh tokens itself.
 
@@ -80,9 +80,9 @@ Run the poller and worker:
 ./bin/lark-asr worker --config config.toml
 ```
 
-## host User Services
+## User Services
 
-On host, the most direct deployment is a pair of user-level systemd services. This keeps using the host-installed `lark-cli`, Codex, lark-cli auth config, and GPU environment from `config.toml`.
+For host-run deployment, the most direct option is a pair of user-level systemd services. This keeps using the host-installed `lark-cli`, Codex, lark-cli auth config, and GPU environment from `config.toml`.
 
 ```bash
 ./scripts/install_user_services.sh
@@ -104,7 +104,7 @@ To remove the services:
 ./scripts/uninstall_user_services.sh
 ```
 
-If services should survive after the SSH login session is gone or after reboot, enable user lingering once on host:
+If services should survive after the SSH login session is gone or after reboot, enable user lingering once on the host:
 
 ```bash
 sudo loginctl enable-linger user
@@ -205,9 +205,9 @@ original `SPEAKER_XX` label. Store profiles under the mounted data directory,
 for example `/data/speaker-profiles/team.json`; voice embeddings are private
 runtime data and are not committed to Git.
 
-The current host host has an existing ASR environment at `/path/to/models/.venv/bin/python` and a local faster-whisper CT2 model at `/path/to/models/models/AI-ModelScope/whisper-large-v3-ct2-float16`. Docker should reuse the model files via `MODELS_DIR`, not mount the old virtualenv.
+Docker should reuse the model files via `MODELS_DIR`; do not mount a host virtualenv.
 
-See `docs/docker-runbook.md` for the Docker migration sequence and current host blockers.
+See `docs/docker-runbook.md` for the Docker deployment sequence.
 
 ## Codex Step
 

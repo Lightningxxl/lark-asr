@@ -23,7 +23,7 @@ The containers should own the application runtime. Host paths are only for:
 
 - `compose.yaml`: Docker-first poller and worker services.
 - `Dockerfile`: lightweight app image with Python, `lark-cli`, and Codex CLI.
-- `docker/Dockerfile.asr`: GPU worker image with app runtime plus ASR dependencies. It defaults to the same Debian/Node base as the app image and uses CUDA-enabled Python wheels to avoid pulling a large NVIDIA CUDA base image on host's slow Docker Hub path.
+- `docker/Dockerfile.asr`: GPU worker image with app runtime plus ASR dependencies. It defaults to the same Debian/Node base as the app image and uses CUDA-enabled Python wheels to avoid pulling a large NVIDIA CUDA base image on slow Docker Hub paths.
 - `docker/Dockerfile.codex-overlay`: thin maintenance image layered on an existing worker image. Use it for application or Codex CLI upgrades so ASR and CUDA Python dependencies are not rebuilt. It also clears inherited Compose service labels from runtime snapshots.
 - `config/docker.example.toml`: container paths and commands.
 - `.env.example`: host path bindings and image pins.
@@ -35,7 +35,7 @@ The containers should own the application runtime. Host paths are only for:
 - Optional `LARK_ASR_HTTP_PROXY`, `LARK_ASR_HTTPS_PROXY`, and
   `LARK_ASR_ALL_PROXY` values pass an egress proxy only to the worker runtime.
 
-## host Prerequisites
+## Host Prerequisites
 
 1. Docker and Docker Compose.
 2. NVIDIA Container Toolkit configured for Docker.
@@ -48,11 +48,11 @@ The containers should own the application runtime. Host paths are only for:
 5. Existing knowledgebase:
    - `KNOWLEDGEBASE_DIR=/path/to/projects/knowledgebase`
 6. Existing model directory or a populated project `models/` directory:
-   - `MODELS_DIR=/path/to/models/models/AI-ModelScope`
+   - `MODELS_DIR=/path/to/models`
 
 ## NVIDIA Runtime
 
-The host audit found that Docker does not currently expose the NVIDIA runtime. Per NVIDIA's official container toolkit installation guide, the usual Ubuntu/Debian path is:
+The deployment audit found that Docker does not currently expose the NVIDIA runtime. Per NVIDIA's official container toolkit installation guide, the usual Ubuntu/Debian path is:
 
 ```bash
 sudo apt-get install -y nvidia-container-toolkit
@@ -68,7 +68,7 @@ docker info | grep -i nvidia
 
 Reference: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
 
-## Known host Blockers
+## Known Host Blockers
 
 - External image/package downloads are slow or unreliable. Keep build mirrors configurable in `.env`; avoid NVIDIA CUDA base images unless the network path is fixed.
 - The Docker worker still needs one successful GPU smoke test after the image finishes building.
@@ -100,7 +100,7 @@ The original worker image remains available as the rollback image.
 ## Migration Sequence
 
 1. Keep host-run services running.
-2. On host, clone this repo as a real git worktree.
+2. On the host, clone this repo as a real git worktree.
 3. Run:
 
    ```bash

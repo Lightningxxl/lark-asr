@@ -9,7 +9,7 @@ import tomllib
 class PathsConfig:
     state_dir: Path = Path("./data")
     work_dir: Path = Path("./work")
-    knowledgebase_dir: Path = Path("/path/to/projects/knowledgebase")
+    knowledgebase_dir: Path = Path("/knowledgebase")
 
 
 @dataclass(frozen=True)
@@ -97,7 +97,7 @@ def load_config(path: str | Path) -> Config:
         work_dir=_path(raw.get("paths", {}).get("work_dir", "./work")),
         knowledgebase_dir=_path(
             raw.get("paths", {}).get(
-                "knowledgebase_dir", "/path/to/projects/knowledgebase"
+                "knowledgebase_dir", "/knowledgebase"
             )
         ),
     )

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "lark-asr"
 version = "0.1.0"
-description = "Feishu/Lark transcript-first ingestion with local ASR fallback for host."
+description = "Feishu/Lark transcript-first ingestion with local ASR fallback."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -28,7 +28,7 @@ class TranscribeFasterWhisperTest(unittest.TestCase):
             {"standard": "too long for this budget", "aliases": []},
             {"standard": "DSPy", "aliases": []},
         ]
-        with patch.object(module, "MAX_HOTWORD_TOKENS", 11):
+        with patch.object(module, "MAX_HOTWORD_TOKENS", 12):
             hotwords, omitted = module.build_decode_hotwords(terms, tokenizer, "Alias DSPy too long for this budget")
         self.assertEqual(hotwords, "Alpha, DSPy")
         self.assertEqual(omitted, ["too long for this budget"])

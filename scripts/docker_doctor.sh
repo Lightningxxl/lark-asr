@@ -30,7 +30,7 @@ for var in LARK_CLI_CONFIG_DIR LARK_CLI_DATA_DIR CODEX_HOME SSH_DIR KNOWLEDGEBAS
 done
 
 if [[ "${ASR_BASE_IMAGE:-}" == nvidia/cuda* ]]; then
-  warn "ASR_BASE_IMAGE=$ASR_BASE_IMAGE will pull a large NVIDIA CUDA base image; unset it or use node:22-bookworm-slim on host's current network"
+  warn "ASR_BASE_IMAGE=$ASR_BASE_IMAGE will pull a large NVIDIA CUDA base image; unset it or use node:22-bookworm-slim on restricted networks"
 fi
 
 if command -v docker >/dev/null 2>&1; then

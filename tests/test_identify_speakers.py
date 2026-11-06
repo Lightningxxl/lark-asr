@@ -48,7 +48,7 @@ class IdentifySpeakersTests(unittest.TestCase):
 
     def test_global_assignment_applies_threshold_and_margin(self):
         labels = ["SPEAKER_00", "SPEAKER_01", "SPEAKER_02"]
-        names = ["Alice", "bob"]
+        names = ["Alice", "Bob"]
         scores = np.array(
             [
                 [0.42, 0.83],
@@ -61,14 +61,14 @@ class IdentifySpeakersTests(unittest.TestCase):
             labels, names, scores, threshold=0.65, margin=0.08
         )
 
-        self.assertEqual(result["SPEAKER_00"]["identity"], "bob")
+        self.assertEqual(result["SPEAKER_00"]["identity"], "Bob")
         self.assertEqual(result["SPEAKER_01"]["identity"], "Alice")
         self.assertEqual(result["SPEAKER_02"]["identity"], "Alice")
 
     def test_global_assignment_rejects_ambiguous_extra_cluster(self):
         result = speaker_id.globally_assign(
             ["SPEAKER_00", "SPEAKER_01", "SPEAKER_02"],
-            ["Alice", "bob"],
+            ["Alice", "Bob"],
             np.array([[0.42, 0.83], [0.88, 0.51], [0.57, 0.55]]),
             threshold=0.65,
             margin=0.08,
@@ -79,14 +79,14 @@ class IdentifySpeakersTests(unittest.TestCase):
     def test_similarity_matrix_uses_best_domain_prototype(self):
         identities = {
             "Alice": [np.array([1.0, 0.0]), np.array([0.7, 0.7])],
-            "bob": [np.array([0.0, 1.0])],
+            "Bob": [np.array([0.0, 1.0])],
         }
         speakers = {"SPEAKER_00": np.array([0.72, 0.69])}
 
         labels, names, scores = speaker_id.similarity_matrix(identities, speakers)
 
         self.assertEqual(labels, ["SPEAKER_00"])
-        self.assertEqual(names, ["Alice", "bob"])
+        self.assertEqual(names, ["Alice", "Bob"])
         self.assertGreater(scores[0, 0], scores[0, 1])
 
     def test_sample_timeline_chunks_spans_full_recording(self):
@@ -129,10 +129,10 @@ class IdentifySpeakersTests(unittest.TestCase):
         self.assertEqual(result[0]["speaker_diarization"], "SPEAKER_00")
 
     def test_mixed_cluster_uses_local_evidence(self):
-        assignment = {"identity": "bob", "accepted": True}
+        assignment = {"identity": "Bob", "accepted": True}
         evidence = [
-            {"range_ms": [0, 10_000], "identity": "bob"},
-            {"range_ms": [12_000, 22_000], "identity": "bob"},
+            {"range_ms": [0, 10_000], "identity": "Bob"},
+            {"range_ms": [12_000, 22_000], "identity": "Bob"},
             {"range_ms": [30_000, 40_000], "identity": "Alice"},
             {"range_ms": [42_000, 52_000], "identity": "Alice"},
         ]
@@ -151,7 +151,7 @@ class IdentifySpeakersTests(unittest.TestCase):
         )
 
         self.assertEqual(decision["mode"], "mixed")
-        self.assertEqual([item["speaker"] for item in result], ["bob", "Alice"])
+        self.assertEqual([item["speaker"] for item in result], ["Bob", "Alice"])
 
     def test_low_confidence_segment_keeps_anonymous_label(self):
         report = {

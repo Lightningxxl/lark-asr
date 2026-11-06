@@ -101,5 +101,5 @@ prompt_template = """
 
 [[project]]
 id = "demo-project"
-path = "projects/active/Demo Demo AliasAIDemo Project"
-aliases = ["Demo Project", "Demo Alias", "Demo Alias", "Demo Alias", "Demo Contact", "Demo Alias", "Demo OS"]
+path = "projects/demo/demo-project"
+aliases = ["Demo Project"]

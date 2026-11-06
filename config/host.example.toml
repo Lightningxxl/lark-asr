@@ -1,10 +1,10 @@
-# Host-run fallback config for host systemd services. Prefer config/docker.example.toml
+# Host-run fallback config for systemd services. Prefer config/docker.example.toml
 # for the managed Docker deployment.
 
 [paths]
 state_dir = "./data"
 work_dir = "./work"
-knowledgebase_dir = "/path/to/projects/knowledgebase"
+knowledgebase_dir = "/path/to/knowledgebase"
 
 [lark]
 cli = "/path/to/.local/share/mise/installs/node/22.22.2/bin/lark-cli"
@@ -41,8 +41,8 @@ auto_kb_write = false
 enabled = true
 command = """
 env \
-  LARK_ASR_PYTHON=/path/to/models/.venv/bin/python \
-  LARK_ASR_WHISPER_MODEL=/path/to/models/models/AI-ModelScope/whisper-large-v3-ct2-float16 \
+  LARK_ASR_PYTHON=/path/to/.venv/bin/python \
+  LARK_ASR_WHISPER_MODEL=/path/to/models/whisper-large-v3-ct2-float16 \
   LARK_ASR_USE_WHISPER=1 \
   LARK_ASR_DEVICE=cuda \
   LARK_ASR_FUNASR_DEVICE=cuda:0 \
@@ -101,5 +101,5 @@ prompt_template = """
 
 [[project]]
 id = "demo-project"
-path = "projects/active/Demo Demo AliasAIDemo Project"
-aliases = ["Demo Project", "Demo Alias", "Demo Alias", "Demo Alias", "Demo Contact", "Demo Alias", "Demo OS"]
+path = "projects/demo/demo-project"
+aliases = ["Demo Project"]
